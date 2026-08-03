@@ -72,6 +72,7 @@
     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
 
+        android:allowBackup="false"
     <application
         android:name="com.red.sovereign.RedSovereignApp"
         android:allowBackup="true"

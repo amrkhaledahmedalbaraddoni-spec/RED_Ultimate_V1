@@ -1,52 +1,139 @@
 server:
   port: 8080
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
 
 spring:
-  data:
-    mongodb:
-      uri: mongodb://${MONGO_USER:-red_user}:${MONGO_PASSWORD:-red_mongo_pass}@db-mongo:27017/red_sovereign?authSource=admin
-    redis:
-      host: cache-redis
-      port: 6379
-      password: ${REDIS_PASSWORD:-}
+  application:
+    name: RED Sovereign Ultimate
 
   datasource:
-    url: jdbc:postgresql://db-postgres:5432/red_sovereign
-    username: ${DB_USER:-red_user}
-    password: ${DB_PASSWORD:-password}
+    url: jdbc:postgresql://db-postgres:5432/${POSTGRES_DB:red_sovereign}
+    username: ${POSTGRES_USER:red_user}
+    password: ${DB_PASSWORD:red_sov_2026_secure}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc.lob.non_contextual_creation: true
+        generate_statistics: false
+        connection.provider_disables_autocommit: true
 
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: false
 
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:red_user}:${MONGO_PASSWORD:red_mongo_secure_2026}@db-mongo:27017/${MONGO_DB:red_sovereign}?authSource=admin
+      auto-index-creation: true
+    redis:
+      host: cache-redis
+      port: 6379
+      password: ${REDIS_PASSWORD:red_redis_2026_secure}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
 
-# RED Sovereign Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+  threads:
+    virtual:
+      enabled: true
+
+# Actuator + Health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+    mongo:
+      enabled: true
+
+# RED Ultimate Sovereign Configuration
 red:
   dinstar:
-    ip: ${DINSTAR_IP:-192.168.1.100}
-    port: ${DINSTAR_PORT:-80}
-    auth-token: ${DINSTAR_AUTH_TOKEN:-}
+    ip: ${DINSTAR_IP:192.168.1.100}
+    port: ${DINSTAR_PORT:80}
+    auth-token: ${DINSTAR_AUTH_TOKEN:}
+    sip-server-ip: ${SIP_SERVER_IP:172.28.0.10}
+    enabled: ${ENABLE_PSTN:true}
 
   minio:
-    endpoint: http://minio:9000
-    access-key: ${MINIO_USER:-redadmin}
-    secret-key: ${MINIO_PASSWORD:-redsecret123}
+    endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+    access-key: ${MINIO_USER:redadmin}
+    secret-key: ${MINIO_PASSWORD:red_minio_2026_secure}
     bucket: red-media
+    public-bucket: red-media
+    backup-bucket: red-backups
+
+  turn:
+    realm: ${TURN_REALM:red.sovereign}
+    secret: ${TURN_SECRET:red_turn_2026_ultra_secure}
+    enabled: true
+
+  sfu:
+    url: http://media-sfu:4000
+    announced-ip: ${SFU_ANNOUNCED_IP:}
+    enabled: ${ENABLE_VOIP_4K:true}
 
   security:
-    jwt-secret: ${JWT_SECRET:-change-me-in-production-please}
-    jwt-expiration-ms: 86400000
+    jwt-secret: ${JWT_SECRET:RED_JWT_2026_ULTRA_SECURE_HS512_KEY_64_CHARS_MINIMUM_CHANGE_IN_PROD_ABCDEFGHIJ}
+    jwt-expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    bcrypt-strength: 12
+    enable-quantum-guard: ${ENABLE_QUANTUM_GUARD:true}
 
-# Logging
+  features:
+    stories: ${ENABLE_STORIES:true}
+    groups: ${ENABLE_GROUPS:true}
+    pstn: ${ENABLE_PSTN:true}
+    voip: ${ENABLE_VOIP_4K:true}
+
+# Logging - Sovereign Audit
 logging:
   level:
     com.red: DEBUG
-    org.springframework.web: INFO
+    org.springframework.web.socket: DEBUG
+    org.springframework.data.mongodb: INFO
+    org.springframework.data.redis: INFO
+    org.hibernate.SQL: WARN
+    io.micrometer: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/red-sovereign.log

@@ -1,21 +1,7 @@
 package com.red.server.database
 
-import org.springframework.data.annotation.Id
-import org.springframework.data.mongodb.core.mapping.Document
-import org.springframework.data.mongodb.core.index.Indexed
+// Legacy compatibility - MessageDocument is now in database package as primary
+// This file kept for backward compatibility with older imports
 
-/**
- * مخزن الرسائل الضخم - مصحح لدعم البحث والمزامنة
- */
-@Document(collection = "messages")
-data class MessageDocument(
-    @Id val id: String, // UUID v7
-    @Indexed val conversationId: String,
-    @Indexed val senderId: String,
-    val type: String,
-    val payload: ByteArray, // مشفر تماماً
-    val timestamp: Long,
-    @Indexed val sequenceNumber: Long,
-    val isEdited: Boolean = false,
-    val replyTo: String? = null
-)
+// Re-export via typealias to avoid duplicate class
+// Actual implementation is in MessageDocument.kt (same package)

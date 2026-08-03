@@ -1,43 +1,48 @@
 package com.red.server.services
 
+import com.red.server.infrastructure.dinstar.DinstarMasterClient
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestTemplate
-import org.springframework.http.*
 
-/**
- * RED Dinstar Hardware Master
- * Controls UC2000-ve-8t directly via its Cloud/API interface.
- */
 @Service
-class DinstarHardwareService {
-    private val restTemplate = RestTemplate()
-    private val deviceUrl = "http://192.168.1.100" // Dynamic from DB
-
-    /**
-     * جلب حالة الـ 8 شرائح لحظياً
-     */
+class DinstarHardwareService(
+    private val masterClient: DinstarMasterClient
+) {
     fun getHardwareStatus(): List<Map<String, Any>> {
-        // في الواقع، نطلب API من جهاز Dinstar
-        // return restTemplate.getForObject("$deviceUrl/api/get_port_status", List::class.java)
-        return (0..7).map { i ->
-            mapOf("index" to i, "status" to "READY", "signal" to 85, "operator" to "Yemen Mobile")
+        val slots = masterClient.getPortsRealtimeStatus()
+        return slots.map { s ->
+            mapOf(
+                "index" to s.index,
+                "slot" to s.index,
+                "status" to s.status,
+                "signal" to s.signal,
+                "operator" to s.operator,
+                "imei" to s.imei,
+                "simNumber" to (s.simNumber ?: ""),
+                "balance" to (s.balance ?: 0.0),
+                "enabled" to s.enabled
+            )
         }
     }
 
-    /**
-     * تغيير إعدادات الـ SIP Trunk في الجهاز
-     */
-    fun updateSipSettings(newSipIp: String) {
-        val payload = mapOf("sip_server" to newSipIp)
-        // restTemplate.postForEntity("$deviceUrl/api/set_sip", payload, String::class.java)
-        println("🔴 RED Hardware: Dinstar SIP redirected to $newSipIp")
+    fun getDetailedStatus(): Map<String, Any> {
+        return mapOf(
+            "device" to masterClient.getDeviceInfo(),
+            "slots" to getHardwareStatus(),
+            "total_slots" to 8,
+            "active_calls" to getHardwareStatus().count { it["status"] == "BUSY" },
+            "online_slots" to getHardwareStatus().count { it["status"] != "OFFLINE" && it["status"] != "DISABLED" }
+        )
     }
 
-    /**
-     * إعادة تشغيل الجهاز أو منفذ معين
-     */
-    fun rebootDevice() {
-        println("⚠️ RED Hardware: Sending REBOOT command to UC2000-ve-8t")
-        // restTemplate.postForEntity("$deviceUrl/api/reboot", null, String::class.java)
+    fun updateSipSettings(newSipIp: String): Map<String, Any> {
+        return masterClient.updateSipSettings(newSipIp)
+    }
+
+    fun rebootDevice(): Map<String, Any> {
+        return masterClient.rebootDevice()
+    }
+
+    fun restartSlot(slotIndex: Int): Map<String, Any> {
+        return masterClient.restartPort(slotIndex)
     }
 }

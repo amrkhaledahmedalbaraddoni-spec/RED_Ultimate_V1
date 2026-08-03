@@ -11,31 +11,50 @@ class AdminController(
     private val approvalService: RedApprovalService,
     private val coreService: CoreService
 ) {
-
-    // 1. جلب قائمة الانتظار
     @GetMapping("/users/pending")
     fun getPendingUsers() = ResponseEntity.ok(approvalService.getPendingList())
 
-    // 2. الموافقة أو الحظر
+    @GetMapping("/users/approved")
+    fun getApproved() = ResponseEntity.ok(approvalService.getApprovedUsers())
+
+    @GetMapping("/users/all")
+    fun getAll() = ResponseEntity.ok(approvalService.getAllUsers())
+
+    @GetMapping("/users/stats")
+    fun getStats() = ResponseEntity.ok(approvalService.getStats())
+
     @PostMapping("/users/update-status")
     fun updateUserStatus(@RequestParam userId: String, @RequestParam status: String): ResponseEntity<Any> {
-        when (status) {
-            "APPROVED" -> approvalService.approveUser(userId)
-            "BANNED" -> approvalService.banUser(userId)
-            "REJECTED" -> approvalService.rejectUser(userId)
-        }
-        return ResponseEntity.ok(mapOf("status" to "SUCCESS"))
+        val result = approvalService.processAction(userId, status)
+        return ResponseEntity.ok(result)
     }
 
-    // 3. مراقبة القصص النشطة
+    @PostMapping("/users/approve/{userId}")
+    fun approve(@PathVariable userId: String) = ResponseEntity.ok(approvalService.approveUser(userId))
+
+    @PostMapping("/users/ban/{userId}")
+    fun ban(@PathVariable userId: String) = ResponseEntity.ok(approvalService.banUser(userId))
+
+    @PostMapping("/users/reject/{userId}")
+    fun reject(@PathVariable userId: String) = ResponseEntity.ok(approvalService.rejectUser(userId))
+
     @GetMapping("/stories/monitor")
     fun monitorStories() = ResponseEntity.ok(coreService.getActiveStoriesCount())
 
-    // 4. مفتاح القتل (Security Kill Switch)
+    @GetMapping("/stories/active")
+    fun activeStories() = ResponseEntity.ok(coreService.getActiveStories())
+
+    @GetMapping("/groups")
+    fun groups() = ResponseEntity.ok(coreService.getAllGroups())
+
     @PostMapping("/security/kill-switch")
     fun activateKillSwitch(@RequestParam userId: String): ResponseEntity<Any> {
-        // إرسال أمر مسح البيانات للجهاز عبر WebSocket
         println("⚠️ RED Master Security: Remote Wipe triggered for $userId")
-        return ResponseEntity.ok(mapOf("action" to "WIPE_SIGNAL_SENT"))
+        return ResponseEntity.ok(mapOf("action" to "WIPE_SIGNAL_SENT", "userId" to userId, "timestamp" to System.currentTimeMillis()))
+    }
+
+    @PostMapping("/security/kill-switch/{userId}")
+    fun killSwitchById(@PathVariable userId: String): ResponseEntity<Any> {
+        return activateKillSwitch(userId)
     }
 }

@@ -1,24 +1,27 @@
 package com.red.sovereign.features.chat
 
 import com.red.sovereign.core.auth.IdentityManager
+import com.red.sovereign.core.network.RedWebSocketClient
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class GroupIDManager @Inject constructor(
     private val identityManager: IdentityManager,
     private val webSocketClient: RedWebSocketClient
 ) {
-    /**
-     * إضافة عضو عبر المعرف السيادي (مثلاً: @RED_77123)
-     */
     fun inviteMemberByHandle(groupId: String, handle: String) {
-        // يتم إرسال طلب للسيرفر للتحقق من المعرف وربطه بالمجموعة
-        println("🔴 RED: Inviting $handle to Group $groupId")
+        println("🔴 RED: Inviting $handle to Group $groupId via ${identityManager.getUserHandle()}")
+        webSocketClient.send("""{"type":"group_invite","groupId":"$groupId","handle":"$handle","inviter":"${identityManager.getRedId()}"}""".toByteArray())
     }
 
-    /**
-     * الحصول على المعرف الخاص بي الذي تم تعيينه بعد موافقة المدير
-     */
     fun getMySovereignID(): String {
-        return identityManager.getUserHandle() ?: "PENDING_APPROVAL"
+        return identityManager.getUserHandle().ifEmpty { "PENDING_APPROVAL" }
+    }
+
+    fun createGroup(name: String, members: List<String>): String {
+        val groupId = "group-${System.currentTimeMillis()}"
+        webSocketClient.send("""{"type":"group_create","groupId":"$groupId","name":"$name","members":${members}}""".toByteArray())
+        return groupId
     }
 }

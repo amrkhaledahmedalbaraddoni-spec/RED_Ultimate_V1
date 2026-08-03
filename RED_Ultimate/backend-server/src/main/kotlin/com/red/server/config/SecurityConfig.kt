@@ -20,7 +20,7 @@ class SecurityConfig {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
-            .csrf { it.disable() } // TODO: Enable CSRF for production with proper token management
+            .csrf { it.disable() }.authorizeHttpRequests { auth -> auth.requestMatchers("/api/**").authenticated().anyRequest().authenticated() } // TODO: Enable CSRF for production with proper token management
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests { auth ->
                 auth

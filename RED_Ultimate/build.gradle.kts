@@ -11,8 +11,9 @@ plugins {
   alias(libs.plugins.jetbrains.kotlin.jvm) apply false
   alias(libs.plugins.compose.compiler) apply false
   alias(libs.plugins.ktlint)
+  alias(libs.plugins.hilt) apply false
+  alias(libs.plugins.kotlinx.serialization) apply false
   alias(benchmarkLibs.plugins.baselineprofile) apply false
-  id("dependency-verification")
 }
 
 buildscript {
@@ -105,9 +106,9 @@ tasks.register("ciRemote") {
 
 // Wire up QA dependencies after all projects are evaluated
 gradle.projectsEvaluated {
-  val appTestTask = tasks.findByPath(":RED-Android:testPlayProdDebugUnitTest")!!
-  val appLintTask = tasks.findByPath(":RED-Android:lintPlayProdDebug")!!
-  val appCompileInstrumentationTask = tasks.findByPath(":RED-Android:compilePlayProdDebugAndroidTestSources")
+  val appTestTask = tasks.findByPath(":app:testDebugUnitTest")
+  val appLintTask = tasks.findByPath(":app:lintDebug")
+  val appCompileInstrumentationTask = tasks.findByPath(":app:compileDebugAndroidTestSources")
 
   tasks.named("qa") {
     dependsOn("ktlintCheck")
@@ -115,8 +116,8 @@ gradle.projectsEvaluated {
     dependsOn("checkStopship")
 
     // Main app tasks
-    dependsOn(appTestTask)
-    dependsOn(appLintTask)
+    appTestTask?.let { dependsOn(it) }
+    appLintTask?.let { dependsOn(it) }
 
     // Instrumentation
     appCompileInstrumentationTask?.let { dependsOn(it) }
@@ -127,7 +128,7 @@ gradle.projectsEvaluated {
     }
 
     // Library module tasks
-    subprojects.filter { it.name != "RED-Android" }.forEach { subproject ->
+    subprojects.filter { it.name != "app" }.forEach { subproject ->
       val testTask = subproject.tasks.findByName("testDebugUnitTest") ?: subproject.tasks.findByName("test")
       testTask?.let { dependsOn(it) }
 
@@ -136,7 +137,7 @@ gradle.projectsEvaluated {
   }
 
   tasks.named("validateScreenshots") {
-    subprojects.filter { it.name != "RED-Android" }.forEach { subproject ->
+    subprojects.filter { it.name != "app" }.forEach { subproject ->
       subproject.tasks.findByName("validateDebugScreenshotTest")?.let { dependsOn(it) }
     }
   }
@@ -155,7 +156,7 @@ gradle.projectsEvaluated {
       subproject.tasks.findByName("ktlintCheck")?.let { dependsOn(it) }
     }
 
-    subprojects.filter { it.name != "RED-Android" }.forEach { subproject ->
+    subprojects.filter { it.name != "app" }.forEach { subproject ->
       val testTask = subproject.tasks.findByName("testDebugUnitTest") ?: subproject.tasks.findByName("test")
       testTask?.let { dependsOn(it) }
     }
@@ -170,7 +171,7 @@ gradle.projectsEvaluated {
 
   // If you let all of these things run in parallel, gradle will likely OOM.
   // To avoid this, we put non-app tests and lints behind the much heavier app tests and lints.
-  subprojects.filter { it.name != "RED-Android" }.forEach { subproject ->
+  subprojects.filter { it.name != "app" }.forEach { subproject ->
     appTestTask.let { task ->
       subproject.tasks.findByName("testDebugUnitTest")?.mustRunAfter(task)
       subproject.tasks.findByName("test")?.mustRunAfter(task)

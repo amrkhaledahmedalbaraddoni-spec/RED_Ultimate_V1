@@ -1,6 +1,6 @@
 package com.red.server.messaging
 
-import com.red.sovereign.proto.ChatProtos
+import com.red.proto.ChatProtos
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Criteria

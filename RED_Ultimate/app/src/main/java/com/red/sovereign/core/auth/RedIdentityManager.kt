@@ -5,7 +5,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class RedIdentityManager @Inject constructor(private val context: Context) {
+class RedIdentityManager @Inject constructor(private val context: Context) : IdentityManager {
     private val prefs = context.getSharedPreferences("red_sovereign_identity", Context.MODE_PRIVATE)
 
     /**

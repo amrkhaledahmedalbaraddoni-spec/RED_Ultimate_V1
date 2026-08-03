@@ -1,0 +1,11 @@
+{
+  "name": "developed-chat-admin",
+  "version": "1.0.0",
+  "description": "Master Authority Control for RED",
+  "main": "index.js",
+  "dependencies": {
+    "react": "^19.0.0",
+    "antd": "^5.0.0",
+    "echarts": "^5.0.0"
+  }
+}

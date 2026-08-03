@@ -1,0 +1,13 @@
+{
+  "name": "red-media-sfu",
+  "version": "1.0.0",
+  "description": "RED System A - High Performance SFU",
+  "main": "server.js",
+  "dependencies": {
+    "mediasoup": "^3.12.0",
+    "ws": "^8.13.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

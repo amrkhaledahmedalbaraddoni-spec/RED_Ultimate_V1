@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package com.red.proto;
+
+option java_package = "com.red.proto";
+option java_outer_classname = "ChatProtos";
+
+message ChatMessage {
+    string id = 1;              // UUID v7
+    string sender_id = 2;
+    string receiver_id = 3;
+    string conversation_id = 4;
+    MessageType type = 5;
+    bytes payload = 6;          // Encrypted content
+    int64 timestamp = 7;
+    int64 sequence_number = 8;
+}
+
+enum MessageType {
+    TEXT = 0;
+    IMAGE = 1;
+    VIDEO = 2;
+    AUDIO = 3;
+    FILE = 4;
+}
+
+message MessageAck {
+    string message_id = 1;
+    AckStatus status = 2;
+}
+
+enum AckStatus {
+    SENT = 0;
+    DELIVERED = 1;
+    READ = 2;
+}

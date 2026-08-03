@@ -1,11 +1,27 @@
 {
-  "name": "developed-chat-admin",
-  "version": "1.0.0",
-  "description": "Master Authority Control for RED",
-  "main": "index.js",
-  "dependencies": {
-    "react": "^19.0.0",
-    "antd": "^5.0.0",
-    "echarts": "^5.0.0"
-  }
+    "name": "red-admin-dashboard",
+    "version": "1.0.0",
+    "description": "RED Sovereign Admin Dashboard",
+    "private": true,
+    "dependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "antd": "^5.22.0",
+        "@ant-design/icons": "^5.5.0",
+        "echarts": "^5.5.0",
+        "echarts-for-react": "^3.0.2"
+    },
+    "devDependencies": {
+        "react-scripts": "^5.0.1"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+    },
+    "browserslist": {
+        "production": [">0.2%", "not dead", "not op_mini all"],
+        "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    }
 }

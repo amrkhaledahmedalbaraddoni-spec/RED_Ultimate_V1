@@ -1,4 +1,4 @@
-package com.red.core.network
+package com.red.sovereign.core.network
 
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull

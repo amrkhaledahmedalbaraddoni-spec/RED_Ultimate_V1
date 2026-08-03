@@ -16,37 +16,55 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0-RED"
+
+        // Maps API key placeholder (required by AndroidManifest.xml)
+        manifestPlaceholders["mapsKey"] = "YOUR_MAPS_API_KEY_HERE"
+
+        // BuildConfig fields for server URLs
+        buildConfigField("String", "SIGNAL_URL", "\"https://chat.red.local\"")
+        buildConfigField("String", "STORAGE_URL", "\"https://storage.red.local\"")
+        buildConfigField("String", "SIGNAL_CDN_URL", "\"https://cdn.red.local\"")
+        buildConfigField("String", "SIGNAL_CDN2_URL", "\"https://cdn2.red.local\"")
+        buildConfigField("String", "SIGNAL_SFU_URL", "\"https://sfu.red.local\"")
+        buildConfigField("String", "SIGNAL_STORAGE_URL", "\"https://storage.red.local\"")
+        buildConfigField("String", "GIPHY_API_KEY", "\"\"")
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+        viewBinding = true
     }
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "**/*.kotlin_metadata",
+                "META-INF/*.kotlin_module",
+                "META-INF/*.version"
+            )
+        }
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+    }
 }
 
-dependencies {
-    // RED Core Security
-    implementation(project(":lib:libsignal-service"))
-    implementation(libs.libsignal.android)
-    implementation(libs.signal.android.database.sqlcipher)
-
-    // System A: 1080p WebRTC
-    implementation(libs.signal.ringrtc)
-    implementation(libs.bundles.media3)
-
-    // System B: GSM Gateway
-    implementation("org.asteriskjava:asterisk-java:3.40.0")
-
-    // Master DI (Hilt)
-    implementation("com.google.dagger:hilt-android:2.52")
-    kapt("com.google.dagger:hilt-compiler:2.52")
-
-    // UI & Navigation
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-}
+// Apply the dependencies file
+apply(from = "dependencies.gradle.kts")

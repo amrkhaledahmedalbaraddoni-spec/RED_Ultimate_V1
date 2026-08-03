@@ -1,6 +1,6 @@
 package com.red.server.websocket
 
-import com.red.sovereign.proto.ChatProtos
+import com.red.proto.ChatProtos
 import com.red.server.messaging.MessageService
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.WebSocketSession

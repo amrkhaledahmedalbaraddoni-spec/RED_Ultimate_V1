@@ -1,0 +1,123 @@
+import React, { useState } from 'react';
+import { Card, Row, Col, Statistic, Button, Modal, Input, Alert, Tag, Space, Table, message } from 'antd';
+import { SafetyOutlined, WarningOutlined, DeleteOutlined, LockOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+
+const SecurityTab: React.FC = () => {
+    const [killSwitchModal, setKillSwitchModal] = useState(false);
+    const [wipeModal, setWipeModal] = useState(false);
+    const [targetUserId, setTargetUserId] = useState('');
+    const [reason, setReason] = useState('');
+
+    const handleKillSwitch = () => {
+        if (!reason) { message.error('Reason required'); return; }
+        fetch('/api/master/v1/security/kill-switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        })
+        .then(() => { message.success('Kill switch activated!'); setKillSwitchModal(false); })
+        .catch(() => message.error('Failed'));
+    };
+
+    const handleWipe = () => {
+        if (!targetUserId) { message.error('User ID required'); return; }
+        fetch(`/api/master/v1/security/wipe/${targetUserId}`, { method: 'POST' })
+            .then(() => { message.success('Wipe signal sent!'); setWipeModal(false); })
+            .catch(() => message.error('Failed'));
+    };
+
+    const securityEvents = [
+        { key: '1', event: 'Failed login attempt', user: 'user-789', time: '3 min ago', severity: 'warning' },
+        { key: '2', event: 'New device registered', user: 'user-123', time: '15 min ago', severity: 'info' },
+        { key: '3', event: 'Session expired', user: 'user-456', time: '1 hour ago', severity: 'info' },
+    ];
+
+    return (
+        <div>
+            <Alert
+                message="Security Operations Center"
+                description="Manage device security, remote wipe, and emergency kill switch."
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+            />
+
+            <Row gutter={[16, 16]}>
+                <Col span={6}>
+                    <Card>
+                        <Statistic title="Threat Level" value="LOW" prefix={<SafetyOutlined />}
+                            valueStyle={{ color: '#52c41a' }} />
+                    </Card>
+                </Col>
+                <Col span={6}>
+                    <Card>
+                        <Statistic title="Blocked Devices" value={0} prefix={<LockOutlined />}
+                            valueStyle={{ color: '#ff4d4f' }} />
+                    </Card>
+                </Col>
+                <Col span={6}>
+                    <Card>
+                        <Statistic title="Active Sessions" value={12} prefix={<SafetyOutlined />}
+                            valueStyle={{ color: '#1890ff' }} />
+                    </Card>
+                </Col>
+                <Col span={6}>
+                    <Card>
+                        <Statistic title="Security Score" value={95} suffix="/100"
+                            prefix={<SafetyOutlined />} valueStyle={{ color: '#52c41a' }} />
+                    </Card>
+                </Col>
+            </Row>
+
+            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                <Col span={12}>
+                    <Card title="⚡ Emergency Actions">
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                            <Button danger block icon={<WarningOutlined />} size="large"
+                                onClick={() => setKillSwitchModal(true)}>
+                                🔴 KILL SWITCH — Wipe All Devices
+                            </Button>
+                            <Button type="primary" danger block icon={<DeleteOutlined />}
+                                onClick={() => setWipeModal(true)}>
+                                Remote Wipe — Single Device
+                            </Button>
+                        </Space>
+                    </Card>
+                </Col>
+                <Col span={12}>
+                    <Card title="Recent Security Events">
+                        <Table
+                            dataSource={securityEvents}
+                            columns={[
+                                { title: 'Event', dataIndex: 'event', key: 'event' },
+                                { title: 'User', dataIndex: 'user', key: 'user' },
+                                { title: 'Severity', dataIndex: 'severity', key: 'severity',
+                                  render: (s: string) => <Tag color={s === 'warning' ? 'orange' : 'blue'}>{s}</Tag> },
+                                { title: 'Time', dataIndex: 'time', key: 'time' },
+                            ]}
+                            pagination={false}
+                            size="small"
+                        />
+                    </Card>
+                </Col>
+            </Row>
+
+            <Modal title="⚠️ KILL SWITCH Confirmation" open={killSwitchModal}
+                onOk={handleKillSwitch} onCancel={() => setKillSwitchModal(false)}
+                okButtonProps={{ danger: true }}>
+                <Alert message="This will WIPE ALL DEVICES immediately!" type="error" showIcon />
+                <Input.TextArea style={{ marginTop: 16 }} placeholder="Reason for kill switch..."
+                    value={reason} onChange={e => setReason(e.target.value)} rows={3} />
+            </Modal>
+
+            <Modal title="Remote Wipe — Single Device" open={wipeModal}
+                onOk={handleWipe} onCancel={() => setWipeModal(false)}
+                okButtonProps={{ danger: true }}>
+                <Input placeholder="Target User ID" value={targetUserId}
+                    onChange={e => setTargetUserId(e.target.value)} />
+            </Modal>
+        </div>
+    );
+};
+
+export default SecurityTab;

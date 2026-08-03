@@ -52,6 +52,9 @@ include(":build-logic:tools")
 include(":benchmark")
 include(":microbenchmark")
 
+// Shared Protobuf definitions
+include(":shared-proto")
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

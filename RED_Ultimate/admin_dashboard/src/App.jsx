@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button, Layout, Menu } from 'antd';
+import React, { lazy, Suspense, useState } from 'react';
+import { Button, Layout, Menu, Spin } from 'antd';
 import { authStore } from './api';
 import Login from './pages/Login';
 import {
@@ -10,12 +10,12 @@ import {
     MobileOutlined,
     SafetyOutlined
 } from '@ant-design/icons';
-import Dashboard from './pages/Dashboard';
-import MasterOverview from './pages/MasterOverview';
-import UserManagement from './pages/UserManagement';
-import MasterLayout from './pages/MasterLayout';
-import DinstarControl from './pages/DinstarControl';
-import Diagnostics from './pages/Diagnostics';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MasterOverview = lazy(() => import('./pages/MasterOverview'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const MasterLayout = lazy(() => import('./pages/MasterLayout'));
+const DinstarControl = lazy(() => import('./pages/DinstarControl'));
+const Diagnostics = lazy(() => import('./pages/Diagnostics'));
 
 const { Header, Sider, Content } = Layout;
 
@@ -68,7 +68,9 @@ function App() {
                     <Button danger onClick={logout}>تسجيل الخروج</Button>
                 </Header>
                 <Content style={{ margin: 16, padding: 24, background: '#f5f5f5' }}>
-                    {renderPage()}
+                    <Suspense fallback={<div style={{display:'grid',placeItems:'center',minHeight:320}}><Spin size="large" /></div>}>
+                        {renderPage()}
+                    </Suspense>
                 </Content>
             </Layout>
         </Layout>

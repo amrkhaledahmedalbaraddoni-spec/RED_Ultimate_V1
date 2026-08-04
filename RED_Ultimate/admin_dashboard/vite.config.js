@@ -7,7 +7,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          react: ['react', 'react-dom'],
           antd: ['antd', '@ant-design/icons'],
           charts: ['echarts', 'echarts-for-react']
         }

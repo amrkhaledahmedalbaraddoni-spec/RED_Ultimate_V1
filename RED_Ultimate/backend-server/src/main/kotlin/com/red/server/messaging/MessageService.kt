@@ -1,141 +1,120 @@
 package com.red.server.messaging
 
-import com.red.sovereign.proto.RedProtos
+import com.red.server.database.ConversationSequence
 import com.red.server.database.MessageDocument
+import com.red.sovereign.proto.RedProtos
+import jakarta.annotation.PostConstruct
+import org.springframework.dao.DuplicateKeyException
+import org.springframework.data.domain.Sort
+import org.springframework.data.mongodb.core.FindAndModifyOptions
 import org.springframework.data.mongodb.core.MongoTemplate
+import org.springframework.data.mongodb.core.index.Index
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.domain.Sort
+import org.springframework.data.mongodb.core.query.Update
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
 
-/**
- * RED Message Service — handles message persistence, deduplication, sequencing, and delivery.
- */
 @Service
 class MessageService(
-    private val mongoTemplate: MongoTemplate,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val mongo: MongoTemplate,
+    private val redis: RedisTemplate<String, String>
 ) {
-    // Dedup cache: message UUID -> timestamp
-    private val dedupCache = mutableMapOf<String, Long>()
+    @PostConstruct
+    fun indexes() {
+        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("uuid", Sort.Direction.ASC).unique())
+        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("receiverId", Sort.Direction.ASC).on("status", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
+        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("conversationId", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
+    }
 
-    /**
-     * Process incoming message: dedup → sequence → store → notify
-     */
-    fun processIncoming(message: RedProtos.ChatMessage): MessageDocument = processIncoming(
-        messageId = message.id,
-        senderId = message.senderId,
-        receiverId = message.receiverId,
-        conversationId = message.conversationId,
-        payload = message.payload.toByteArray(),
-        messageType = message.type.ifBlank { "TEXT" }
+    fun processIncoming(message: RedProtos.ChatMessage): MessageDocument {
+        validate(message)
+        mongo.findOne(Query(Criteria.where("uuid").`is`(message.id)), MessageDocument::class.java)?.let { existing ->
+            require(existing.senderId == message.senderId && existing.receiverId == message.receiverId && existing.conversationId == message.conversationId) {
+                "Message UUID collision"
+            }
+            return existing
+        }
+
+        val stored = MessageDocument(
+            uuid = message.id,
+            conversationId = message.conversationId,
+            senderId = message.senderId,
+            receiverId = message.receiverId,
+            payload = message.payload.toByteArray(),
+            messageType = message.type.ifBlank { "TEXT" },
+            sequenceNumber = nextSequence(message.conversationId),
+            status = "SENT"
+        )
+        val saved = try { mongo.save(stored) } catch (_: DuplicateKeyException) {
+            mongo.findOne(Query(Criteria.where("uuid").`is`(message.id)), MessageDocument::class.java)
+                ?: throw IllegalStateException("Message deduplication failed")
+        }
+        redis.opsForZSet().add("red:presence:index", message.senderId, System.currentTimeMillis().toDouble())
+        redis.convertAndSend("red:messages:${message.receiverId}", saved.uuid)
+        return saved
+    }
+
+    fun pendingFor(receiverId: String, limit: Int = 500): List<MessageDocument> = mongo.find(
+        Query(Criteria.where("receiverId").`is`(receiverId).and("status").`is`("SENT").and("deletedAt").`is`(null))
+            .with(Sort.by(Sort.Direction.ASC, "createdAt")).limit(limit.coerceIn(1, 500)),
+        MessageDocument::class.java
     )
 
-    fun processIncoming(
-        senderId: String,
-        receiverId: String,
-        conversationId: String,
-        payload: ByteArray,
-        messageType: String = "TEXT",
-        messageId: String = UUID.randomUUID().toString()
-    ): MessageDocument {
-        val messageUuid = messageId.ifBlank { UUID.randomUUID().toString() }
+    fun getMissedMessages(userId: String, conversationId: String, fromSequence: Long, toSequence: Long, limit: Int = 500): List<MessageDocument> {
+        val criteria = Criteria.where("conversationId").`is`(conversationId)
+            .andOperator(Criteria().orOperator(Criteria.where("senderId").`is`(userId), Criteria.where("receiverId").`is`(userId)))
+            .and("sequenceNumber").gte(fromSequence.coerceAtLeast(0))
+            .and("deletedAt").`is`(null)
+        if (toSequence > 0) criteria.and("sequenceNumber").lte(toSequence)
+        return mongo.find(Query(criteria).with(Sort.by(Sort.Direction.ASC, "sequenceNumber")).limit(limit.coerceIn(1, 500)), MessageDocument::class.java)
+    }
 
-        // 1. Dedup check
-        if (dedupCache.containsKey(messageUuid)) {
-            throw DuplicateMessageException("Message $messageUuid already processed")
+    /** Only the intended receiver may advance SENT -> DELIVERED -> READ. */
+    fun acknowledge(receiverId: String, messageId: String, requestedStatus: String): MessageDocument {
+        val status = requestedStatus.uppercase()
+        require(status == "DELIVERED" || status == "READ") { "Unsupported ACK status" }
+        val message = mongo.findOne(Query(Criteria.where("uuid").`is`(messageId)), MessageDocument::class.java)
+            ?: throw NoSuchElementException("Message not found")
+        require(message.receiverId == receiverId) { "Only the recipient can acknowledge this message" }
+        if (rank(status) > rank(message.status)) {
+            message.status = status
+            if (status == "DELIVERED" && message.deliveredAt == null) message.deliveredAt = Instant.now()
+            if (status == "READ") { if (message.deliveredAt == null) message.deliveredAt = Instant.now(); message.readAt = Instant.now() }
+            mongo.save(message)
         }
-        dedupCache[messageUuid] = System.currentTimeMillis()
-        
-        // 2. Generate sequence number
-        val sequence = redisTemplate.opsForValue()
-            .increment("red:seq:$conversationId") ?: 1L
-
-        // 3. Store message
-        val message = MessageDocument(
-            id = null,
-            uuid = messageUuid,
-            conversationId = conversationId,
-            senderId = senderId,
-            receiverId = receiverId,
-            payload = payload,
-            messageType = messageType,
-            sequenceNumber = sequence,
-            status = "DELIVERED",
-            createdAt = Instant.now(),
-            deliveredAt = null,
-            readAt = null
-        )
-        mongoTemplate.save(message)
-
-        // 4. Update a timestamped presence index (no Redis KEYS scan).
-        redisTemplate.opsForZSet().add("red:presence:index", senderId, System.currentTimeMillis().toDouble())
-
-        // 5. Notify via Redis pub/sub
-        redisTemplate.convertAndSend(
-            "red:messages:$receiverId",
-            "$messageUuid|$conversationId|$sequence"
-        )
-
         return message
     }
 
-    /**
-     * Get messages for a conversation with pagination
-     */
-    fun getMessages(conversationId: String, limit: Int = 50, beforeSequence: Long? = null): List<MessageDocument> {
-        val query = Query(Criteria.where("conversationId").`is`(conversationId))
-        if (beforeSequence != null) {
-            query.addCriteria(Criteria.where("sequenceNumber").lt(beforeSequence))
-        }
-        query.limit(limit)
-        return mongoTemplate.find(query, MessageDocument::class.java)
+    fun findAuthorized(messageId: String, userId: String): MessageDocument? = mongo.findOne(
+        Query(Criteria.where("uuid").`is`(messageId).orOperator(Criteria.where("senderId").`is`(userId), Criteria.where("receiverId").`is`(userId))),
+        MessageDocument::class.java
+    )
+
+    private fun nextSequence(conversationId: String): Long {
+        val sequence = mongo.findAndModify(
+            Query(Criteria.where("id").`is`(conversationId)), Update().inc("sequence", 1),
+            FindAndModifyOptions.options().upsert(true).returnNew(true), ConversationSequence::class.java
+        ) ?: error("Unable to allocate conversation sequence")
+        return sequence.sequence
     }
 
-    fun getMissedMessages(
-        conversationId: String,
-        fromSequence: Long,
-        toSequence: Long,
-        limit: Int = 500
-    ): List<MessageDocument> {
-        val safeLimit = limit.coerceIn(1, 500)
-        val criteria = Criteria.where("conversationId").`is`(conversationId)
-            .and("sequenceNumber").gte(fromSequence)
-        if (toSequence > 0) criteria.lte(toSequence)
-        return mongoTemplate.find(
-            Query(criteria).with(Sort.by(Sort.Direction.ASC, "sequenceNumber")).limit(safeLimit),
-            MessageDocument::class.java
-        )
+    private fun validate(message: RedProtos.ChatMessage) {
+        val id = runCatching { UUID.fromString(message.id) }.getOrElse { throw IllegalArgumentException("Message ID must be UUID v7") }
+        require(id.version() == 7) { "Message ID must be UUID v7" }
+        require(message.senderId.matches(RED_ID)) { "Invalid sender RED ID" }
+        require(message.receiverId.matches(RED_ID) && message.receiverId != message.senderId) { "Invalid receiver RED ID" }
+        require(message.conversationId.length in 8..128) { "Invalid conversation ID" }
+        require(message.payload.size() in 1..1_048_576) { "Encrypted envelope must contain 1 byte to 1 MiB" }
+        require(message.type.ifBlank { "TEXT" } in TYPES) { "Unsupported message type" }
     }
 
-    /**
-     * Acknowledge message delivery
-     */
-    fun acknowledgeDelivery(messageUuid: String) {
-        val query = Query(Criteria.where("uuid").`is`(messageUuid))
-        val message = mongoTemplate.findOne(query, MessageDocument::class.java)
-        message?.let {
-            it.deliveredAt = Instant.now()
-            it.status = "DELIVERED"
-            mongoTemplate.save(it)
-        }
-    }
+    private fun rank(status: String) = when (status) { "SENT" -> 1; "DELIVERED" -> 2; "READ" -> 3; else -> 0 }
 
-    /**
-     * Mark message as read
-     */
-    fun markAsRead(messageUuid: String) {
-        val query = Query(Criteria.where("uuid").`is`(messageUuid))
-        val message = mongoTemplate.findOne(query, MessageDocument::class.java)
-        message?.let {
-            it.readAt = Instant.now()
-            it.status = "READ"
-            mongoTemplate.save(it)
-        }
+    companion object {
+        private val RED_ID = Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
+        private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "FILE", "SYSTEM")
     }
-
-    class DuplicateMessageException(message: String) : RuntimeException(message)
 }

@@ -48,6 +48,23 @@ class RedWebSocketClient(
         return id
     }
 
+    fun acknowledge(messageId: String, sequence: Long, status: String) {
+        require(status == "DELIVERED" || status == "READ")
+        val envelope = RedProtos.RedRED.newBuilder().setAck(
+            RedProtos.MessageAck.newBuilder().setMessageId(messageId).setSequenceNumber(sequence).setStatus(status)
+        ).build()
+        check(socket?.send(envelope.toByteArray().toByteString()) == true) { "RED WebSocket is not connected" }
+    }
+
+    fun typing(conversationId: String, targetRedId: String, active: Boolean) {
+        val sender = requireNotNull(tokens.redId)
+        val envelope = RedProtos.RedRED.newBuilder().setTyping(
+            RedProtos.TypingRED.newBuilder().setConversationId(conversationId).setUserId(sender)
+                .setTargetUserId(targetRedId).setIsTyping(active)
+        ).build()
+        socket?.send(envelope.toByteArray().toByteString())
+    }
+
     fun disconnect() { socket?.close(1000, "client logout"); socket = null }
 }
 

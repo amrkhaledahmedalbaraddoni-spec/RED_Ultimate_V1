@@ -43,6 +43,7 @@ message TypingRED {
     string conversation_id = 1;
     string user_id = 2;
     bool is_typing = 3;
+    string target_user_id = 4;
 }
 
 message DeleteRED {

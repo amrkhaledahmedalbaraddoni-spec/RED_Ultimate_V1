@@ -1,10 +1,12 @@
 package com.red.server.websocket
 
 import com.google.protobuf.ByteString
+import com.red.server.database.MessageDocument
 import com.red.server.database.RedisManager
 import com.red.server.messaging.DeleteService
 import com.red.server.messaging.MessageService
 import com.red.sovereign.proto.RedProtos
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
@@ -14,87 +16,102 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class RedMasterHandler(
-    private val messageService: MessageService,
-    private val deleteService: DeleteService,
-    private val redisManager: RedisManager
+    private val messages: MessageService,
+    private val deletes: DeleteService,
+    private val redisManager: RedisManager,
+    private val redis: StringRedisTemplate
 ) : BinaryWebSocketHandler() {
-    private val activeSessions = ConcurrentHashMap<String, WebSocketSession>()
+    private val sessions = ConcurrentHashMap<String, ConcurrentHashMap<String, WebSocketSession>>()
 
-    override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
-        val signal = RedProtos.RedRED.parseFrom(message.payload)
-        when (signal.signalCase) {
-            RedProtos.RedRED.SignalCase.MESSAGE -> handleIncomingMessage(session, signal.message)
-            RedProtos.RedRED.SignalCase.TYPING -> handleTyping(session, signal.typing)
-            RedProtos.RedRED.SignalCase.SYNC_REQ -> handleSync(session, signal.syncReq)
-            RedProtos.RedRED.SignalCase.DELETE -> handleDelete(session, signal.delete)
+    override fun handleBinaryMessage(session: WebSocketSession, frame: BinaryMessage) {
+        val envelope = RedProtos.RedRED.parseFrom(frame.payload)
+        when (envelope.signalCase) {
+            RedProtos.RedRED.SignalCase.MESSAGE -> receiveMessage(session, envelope.message)
+            RedProtos.RedRED.SignalCase.ACK -> receiveAck(session, envelope.ack)
+            RedProtos.RedRED.SignalCase.TYPING -> receiveTyping(session, envelope.typing)
+            RedProtos.RedRED.SignalCase.SYNC_REQ -> sync(session, envelope.syncReq)
+            RedProtos.RedRED.SignalCase.DELETE -> delete(session, envelope.delete)
             else -> Unit
         }
     }
 
-    private fun handleIncomingMessage(session: WebSocketSession, message: RedProtos.ChatMessage) {
-        val authenticatedUserId = requireUserId(session)
-        require(message.senderId == authenticatedUserId) { "senderId does not match authenticated user" }
-
-        val stored = messageService.processIncoming(message)
-        val ack = RedProtos.RedRED.newBuilder().setAck(
-            RedProtos.MessageAck.newBuilder()
-                .setMessageId(message.id)
-                .setSequenceNumber(stored.sequenceNumber)
-                .setStatus("SENT")
-        ).build()
-        session.sendMessage(BinaryMessage(ack.toByteArray()))
-
-        activeSessions[message.receiverId]
-            ?.takeIf { it.isOpen }
-            ?.sendMessage(BinaryMessage(RedProtos.RedRED.newBuilder().setMessage(message).build().toByteArray()))
+    private fun receiveMessage(session: WebSocketSession, incoming: RedProtos.ChatMessage) {
+        val sender = userId(session)
+        require(incoming.senderId == sender) { "senderId does not match authenticated RED ID" }
+        val stored = messages.processIncoming(incoming)
+        send(session, ack(stored, "SENT"))
+        sendToUser(stored.receiverId, messageEnvelope(stored))
+        // Synchronize the sender's other approved devices without echoing to this socket.
+        sendToUser(sender, messageEnvelope(stored), exceptSessionId = session.id)
     }
 
-    private fun handleTyping(session: WebSocketSession, typing: RedProtos.TypingRED) {
-        require(typing.userId == requireUserId(session)) { "userId does not match authenticated user" }
-        redisManager.setTyping(typing.userId, typing.conversationId)
+    private fun receiveAck(session: WebSocketSession, incoming: RedProtos.MessageAck) {
+        val recipient = userId(session)
+        val stored = messages.acknowledge(recipient, incoming.messageId, incoming.status)
+        val ack = ack(stored, stored.status)
+        sendToUser(stored.senderId, ack)
+        sendToUser(stored.receiverId, ack, exceptSessionId = session.id)
     }
 
-    private fun handleSync(session: WebSocketSession, request: RedProtos.SyncRequest) {
-        messageService.getMissedMessages(
-            request.conversationId,
-            request.fromSequence,
-            request.toSequence
-        ).forEach { stored ->
-            val message = RedProtos.ChatMessage.newBuilder()
-                .setId(stored.uuid)
-                .setConversationId(stored.conversationId)
-                .setSenderId(stored.senderId)
-                .setReceiverId(stored.receiverId)
-                .setPayload(ByteString.copyFrom(stored.payload))
-                .setTimestamp(stored.createdAt.toEpochMilli())
-                .setSequenceNumber(stored.sequenceNumber)
-                .setType(stored.messageType)
-                .build()
-            session.sendMessage(
-                BinaryMessage(RedProtos.RedRED.newBuilder().setMessage(message).build().toByteArray())
-            )
-        }
+    private fun receiveTyping(session: WebSocketSession, typing: RedProtos.TypingRED) {
+        val sender = userId(session)
+        require(typing.userId == sender) { "userId does not match authenticated RED ID" }
+        require(typing.targetUserId.isNotBlank() && typing.targetUserId != sender) { "targetUserId is required" }
+        redisManager.setTyping(sender, typing.conversationId)
+        sendToUser(typing.targetUserId, RedProtos.RedRED.newBuilder().setTyping(typing).build())
     }
 
-    private fun handleDelete(session: WebSocketSession, delete: RedProtos.DeleteRED) {
-        if (!delete.forEveryone) return
-        val deleted = deleteService.deleteForEveryone(delete.messageId, requireUserId(session))
-        if (deleted) {
-            val envelope = BinaryMessage(
-                RedProtos.RedRED.newBuilder().setDelete(delete).build().toByteArray()
-            )
-            activeSessions.values.filter { it.isOpen }.forEach { it.sendMessage(envelope) }
-        }
+    private fun sync(session: WebSocketSession, request: RedProtos.SyncRequest) {
+        messages.getMissedMessages(userId(session), request.conversationId, request.fromSequence, request.toSequence)
+            .forEach { send(session, messageEnvelope(it)) }
+    }
+
+    private fun delete(session: WebSocketSession, request: RedProtos.DeleteRED) {
+        if (!request.forEveryone) return
+        val original = deletes.deleteForEveryone(request.messageId, userId(session)) ?: return
+        val envelope = RedProtos.RedRED.newBuilder().setDelete(request).build()
+        sendToUser(original.senderId, envelope)
+        sendToUser(original.receiverId, envelope)
     }
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
-        activeSessions[requireUserId(session)] = session
+        val redId = userId(session)
+        sessions.computeIfAbsent(redId) { ConcurrentHashMap() }[session.id] = session
+        redis.opsForZSet().add("red:presence:index", redId, System.currentTimeMillis().toDouble())
+        messages.pendingFor(redId).forEach { send(session, messageEnvelope(it)) }
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
-        activeSessions.entries.removeIf { it.value.id == session.id }
+        val redId = session.attributes["userId"] as? String ?: return
+        sessions[redId]?.let { userSessions ->
+            userSessions.remove(session.id)
+            if (userSessions.isEmpty()) sessions.remove(redId, userSessions)
+        }
     }
 
-    private fun requireUserId(session: WebSocketSession): String =
-        session.attributes["userId"] as? String ?: error("Authenticated user is missing")
+    private fun sendToUser(redId: String, envelope: RedProtos.RedRED, exceptSessionId: String? = null) {
+        sessions[redId]?.values?.filter { it.isOpen && it.id != exceptSessionId }?.forEach { send(it, envelope) }
+    }
+
+    private fun send(session: WebSocketSession, envelope: RedProtos.RedRED) {
+        synchronized(session) {
+            if (session.isOpen) session.sendMessage(BinaryMessage(envelope.toByteArray()))
+        }
+    }
+
+    private fun messageEnvelope(message: MessageDocument): RedProtos.RedRED {
+        val value = RedProtos.ChatMessage.newBuilder()
+            .setId(message.uuid).setConversationId(message.conversationId)
+            .setSenderId(message.senderId).setReceiverId(message.receiverId)
+            .setPayload(ByteString.copyFrom(message.payload)).setTimestamp(message.createdAt.toEpochMilli())
+            .setSequenceNumber(message.sequenceNumber).setType(message.messageType).build()
+        return RedProtos.RedRED.newBuilder().setMessage(value).build()
+    }
+
+    private fun ack(message: MessageDocument, status: String): RedProtos.RedRED = RedProtos.RedRED.newBuilder().setAck(
+        RedProtos.MessageAck.newBuilder().setMessageId(message.uuid).setSequenceNumber(message.sequenceNumber).setStatus(status)
+    ).build()
+
+    private fun userId(session: WebSocketSession): String =
+        session.attributes["userId"] as? String ?: error("Authenticated RED ID is missing")
 }

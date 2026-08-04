@@ -29,12 +29,14 @@ class RedConnectionService : Service() {
     private var attempts = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var tokenStore: TokenStore
+    private lateinit var messageStore: MessageStore
     private lateinit var socket: RedWebSocketClient
 
     override fun onCreate() {
         super.onCreate()
         createChannels()
         tokenStore = TokenStore(this)
+        messageStore = MessageStore(this)
         socket = RedWebSocketClient(tokenStore, ::onEnvelope, ::onState)
     }
 
@@ -71,17 +73,31 @@ class RedConnectionService : Service() {
     }
 
     private fun onEnvelope(envelope: RedProtos.RedRED) {
-        if (envelope.signalCase == RedProtos.RedRED.SignalCase.MESSAGE) {
-            val sender = envelope.message.senderId
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.notify(sender.hashCode(), NotificationCompat.Builder(this, MESSAGE_CHANNEL)
-                .setSmallIcon(android.R.drawable.stat_notify_chat)
-                .setContentTitle("رسالة RED جديدة")
-                .setContentText("رسالة مشفرة من $sender")
-                .setContentIntent(openAppIntent())
-                .setAutoCancel(true)
-                .build())
+        when (envelope.signalCase) {
+            RedProtos.RedRED.SignalCase.MESSAGE -> {
+                val message = envelope.message
+                runCatching { messageStore.save(message) }.onSuccess {
+                    if (message.receiverId == tokenStore.redId) {
+                        socket.acknowledge(message.id, message.sequenceNumber, "DELIVERED")
+                        notifyEncryptedMessage(message.senderId)
+                    }
+                }
+            }
+            RedProtos.RedRED.SignalCase.ACK -> messageStore.updateStatus(envelope.ack.messageId, envelope.ack.status)
+            RedProtos.RedRED.SignalCase.DELETE -> messageStore.delete(envelope.delete.messageId)
+            else -> Unit
         }
+    }
+
+    private fun notifyEncryptedMessage(sender: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(sender.hashCode(), NotificationCompat.Builder(this, MESSAGE_CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle("رسالة RED جديدة")
+            .setContentText("رسالة مشفرة من $sender")
+            .setContentIntent(openAppIntent())
+            .setAutoCancel(true)
+            .build())
     }
 
     private fun connectionNotification(text: String) = NotificationCompat.Builder(this, CONNECTION_CHANNEL)

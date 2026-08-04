@@ -36,6 +36,13 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun follow(post: Post) = viewModelScope.launch {
+        when (val result = api.follow(post.authorRedId)) {
+            is ApiResult.Success -> state = FeedState.Message("تمت متابعة @${post.authorUsername}")
+            is ApiResult.Error -> state = FeedState.Error(result.message)
+        }
+    }
+
     fun toggleLike(post: Post) = viewModelScope.launch {
         // The first feed version exposes aggregate counts only. Adding a LIKE is idempotent
         // per account on the server; viewer-specific unlike state comes with the social graph.
@@ -46,4 +53,4 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-sealed interface FeedState { data object Loading: FeedState; data object Ready: FeedState; data object Publishing: FeedState; data class Error(val message:String): FeedState }
+sealed interface FeedState { data object Loading: FeedState; data object Ready: FeedState; data object Publishing: FeedState; data class Message(val text:String): FeedState; data class Error(val message:String): FeedState }

@@ -34,9 +34,18 @@ class FeedService(private val mongo: MongoTemplate, private val users: UserAccou
         return post
     }
 
-    fun feed(scope: PostVisibility?, before: Instant?, limit: Int): FeedResponse {
+    fun feed(userId: UUID, scope: FeedScope, before: Instant?, limit: Int): FeedResponse {
         val criteria = Criteria.where("deletedAt").`is`(null).and("parentId").`is`(null)
-        scope?.let { criteria.and("visibility").`is`(it) }
+        when (scope) {
+            FeedScope.ALL -> Unit
+            FeedScope.YEMEN -> criteria.and("visibility").`is`(PostVisibility.LOCAL_YEMEN)
+            FeedScope.FOLLOWING -> {
+                val followed = mongo.find(Query(Criteria.where("followerId").`is`(userId.toString())), FollowDocument::class.java)
+                    .map(FollowDocument::followedId)
+                if (followed.isEmpty()) return FeedResponse(emptyList(), null)
+                criteria.and("authorId").`in`(followed)
+            }
+        }
         before?.let { criteria.and("createdAt").lt(it) }
         val posts = mongo.find(Query(criteria).with(Sort.by(Sort.Direction.DESC, "createdAt")).limit(limit.coerceIn(1, 50)), PostDocument::class.java)
         return FeedResponse(posts, posts.lastOrNull()?.createdAt?.toString())
@@ -75,6 +84,22 @@ class FeedService(private val mongo: MongoTemplate, private val users: UserAccou
         mongo.updateFirst(Query(Criteria.where("id").`is`(postId).and("poll.options.id").`is`(request.optionId)),
             Update().inc("poll.options.$.votes", 1), PostDocument::class.java)
         return requireNotNull(activePost(postId))
+    }
+
+    fun follow(userId: UUID, targetRedId: String) {
+        val target = users.findByRedId(targetRedId) ?: throw NoSuchElementException("RED identity not found")
+        require(target.id != userId) { "A user cannot follow their own account" }
+        mongo.save(FollowDocument("$userId:${target.id}", userId.toString(), target.id.toString()))
+    }
+
+    fun unfollow(userId: UUID, targetRedId: String) {
+        val target = users.findByRedId(targetRedId) ?: return
+        mongo.remove(Query(Criteria.where("id").`is`("$userId:${target.id}")), FollowDocument::class.java)
+    }
+
+    fun following(userId: UUID): List<String> {
+        val ids = mongo.find(Query(Criteria.where("followerId").`is`(userId.toString())), FollowDocument::class.java).map(FollowDocument::followedId)
+        return users.findAllById(ids.map(UUID::fromString)).map { it.redId }
     }
 
     fun delete(userId: UUID, postId: String) {

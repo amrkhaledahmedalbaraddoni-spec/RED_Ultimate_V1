@@ -28,6 +28,7 @@ data class PostDocument(
 )
 
 enum class PostVisibility { PUBLIC, LOCAL_YEMEN }
+enum class FeedScope { ALL, FOLLOWING, YEMEN }
 enum class PostKind { POST, POLL }
 data class PostMedia(val objectKey: String, val mimeType: String, val width: Int? = null, val height: Int? = null)
 data class Poll(val options: List<PollOption>, val expiresAt: Instant?)
@@ -38,6 +39,14 @@ data class PostReaction(@Id val id: String, val postId: String, val userId: Stri
 
 @Document("poll_votes")
 data class PollVote(@Id val id: String, val postId: String, val userId: String, val optionId: String, val createdAt: Instant = Instant.now())
+
+@Document("follows")
+data class FollowDocument(
+    @Id val id: String,
+    @Indexed val followerId: String,
+    @Indexed val followedId: String,
+    val createdAt: Instant = Instant.now()
+)
 
 data class CreatePostRequest(
     val text: String,

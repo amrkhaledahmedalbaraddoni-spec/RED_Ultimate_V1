@@ -11,7 +11,7 @@ class FeedApi(private val client: AuthorizedApiClient) {
 
     suspend fun load(scope: String?, cursor: String? = null): ApiResult<FeedResponse> {
         val query = buildList {
-            scope?.let { add("scope=${URLEncoder.encode(it, "UTF-8")}") }
+            add("scope=${URLEncoder.encode(scope ?: "ALL", "UTF-8")}")
             cursor?.let { add("before=${URLEncoder.encode(it, "UTF-8")}") }
             add("limit=20")
         }.joinToString("&")
@@ -23,6 +23,11 @@ class FeedApi(private val client: AuthorizedApiClient) {
 
     suspend fun react(postId: String, type: String, active: Boolean): ApiResult<Post> =
         client.request("POST", "/api/feed/posts/$postId/reactions", json.encodeToString(ReactionRequest(type, active))).decode { json.decodeFromString<Post>(it) }
+
+    suspend fun follow(redId: String): ApiResult<Unit> = when (val result = client.request("POST", "/api/feed/following/$redId")) {
+        is ApiResult.Success -> ApiResult.Success(result.code, Unit)
+        is ApiResult.Error -> result
+    }
 
     private inline fun <T> ApiResult<String>.decode(block: (String) -> T): ApiResult<T> = when (this) {
         is ApiResult.Success -> runCatching { ApiResult.Success(code, block(value)) }.getOrElse { ApiResult.Error(code, "INVALID_SERVER_RESPONSE") }

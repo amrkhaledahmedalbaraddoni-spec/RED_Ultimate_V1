@@ -178,8 +178,8 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, on
                 listOf("لك", "أتابعهم", "اليمن").forEachIndexed { i, title ->
                     FilterChip(filter == i, {
                         filter = i
-                        feed.load(if (i == 2) "LOCAL_YEMEN" else null)
-                    }, { Text(if (i == 1) "$title · قريباً" else title) }, enabled = i != 1)
+                        feed.load(when (i) { 1 -> "FOLLOWING"; 2 -> "YEMEN"; else -> null })
+                    }, { Text(title) })
                 }
             }
         }
@@ -190,11 +190,12 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, on
                 }
             }
         }
+        if (feed.state is FeedState.Message) item { Text((feed.state as FeedState.Message).text, color = AqyalGold, modifier = Modifier.padding(horizontal = 18.dp)) }
         when {
             feed.state == FeedState.Loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }
             feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض RED", (feed.state as FeedState.Error).message) }
             feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
-            else -> items(feed.posts, key = { it.id }) { PostCard(it, feed::toggleLike) }
+            else -> items(feed.posts, key = { it.id }) { PostCard(it, account.redId, feed::toggleLike, feed::follow) }
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
@@ -211,13 +212,14 @@ private fun StoryCircle(label: String, own: Boolean) = Column(horizontalAlignmen
 }
 
 @Composable
-private fun PostCard(post: Post, onLike: (Post) -> Unit) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+private fun PostCard(post: Post, currentRedId: String, onLike: (Post) -> Unit, onFollow: (Post) -> Unit) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
     Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(post.authorDisplayName.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(post.authorDisplayName, fontWeight = FontWeight.Bold)
                 Text("@${post.authorUsername} · ${post.authorRedId}", color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            if (post.authorRedId != currentRedId) TextButton({ onFollow(post) }) { Text("متابعة") }
             AssistChip({}, { Text(if (post.visibility == "LOCAL_YEMEN") "اليمن" else "عام") }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) })
         }
         Text(post.text, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)

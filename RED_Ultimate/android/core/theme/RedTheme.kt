@@ -1,19 +1,26 @@
 package com.red.core.theme
 
-import androidx.compose.material3.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-val RedPrimary = Color(0xFFD32F2F)
-val RedDark = Color(0xFFB71C1C)
-val BlackBackground = Color(0xFF0A0A0A)
-val SurfaceDark = Color(0xFF1E1E1E)
+val SovereignGold = Color(0xFFF4B400)
+val SovereignBlue = Color(0xFF1E88E5)
+val ObsidianBlack = Color(0xFF07090E)
+val DeepRoyalBlue = Color(0xFF0F172A)
+val SurfaceObsidian = Color(0xFF131B2E)
 
-private val DarkColorScheme = darkColorScheme(
-    primary = RedPrimary,
-    secondary = RedDark,
-    background = BlackBackground,
-    surface = SurfaceDark,
+private val SovereignDarkColorScheme = darkColorScheme(
+    primary = SovereignBlue,
+    secondary = SovereignGold,
+    background = ObsidianBlack,
+    surface = SurfaceObsidian,
     onPrimary = Color.White,
+    onSecondary = Color.Black,
     onBackground = Color.White,
     onSurface = Color.White
 )
@@ -21,8 +28,29 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun REDTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = DarkColorScheme,
-        typography = Typography(), // 2026 Modern Sans
+        colorScheme = SovereignDarkColorScheme,
+        typography = Typography(),
         content = content
     )
+}
+
+/**
+ * خلفية أسطورية فاخرة للمنظومة السيادية تعتمد على تدرجات حية (Obsidian & Deep Royal)
+ */
+@Composable
+fun SovereignBackground(content: @Composable () -> Unit) {
+    val epicGradient = Brush.verticalGradient(
+        colors = listOf(
+            ObsidianBlack,
+            DeepRoyalBlue,
+            Color(0xFF1A233A)
+        )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(epicGradient)
+    ) {
+        content()
+    }
 }

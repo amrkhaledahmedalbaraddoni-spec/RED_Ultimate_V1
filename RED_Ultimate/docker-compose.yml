@@ -42,6 +42,10 @@ services:
   media-sfu:
     build: ./media-sfu
     container_name: red-media-sfu
+    environment:
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP:?MEDIASOUP_ANNOUNCED_IP is required}
+      - MEDIASOUP_WORKERS=${MEDIASOUP_WORKERS:-2}
     ports: ["4000:4000", "40000-40100:40000-40100/udp"]
     networks: ["red-net"]
 

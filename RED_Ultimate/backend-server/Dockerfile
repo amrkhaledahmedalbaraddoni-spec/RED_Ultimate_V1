@@ -1,5 +1,5 @@
 # Build context must be RED_Ultimate/ so backend and shared-proto use one protocol source.
-FROM gradle:8.12-jdk21 AS builder
+FROM gradle:9.2.1-jdk21 AS builder
 
 WORKDIR /build
 COPY backend-server/ backend-server/

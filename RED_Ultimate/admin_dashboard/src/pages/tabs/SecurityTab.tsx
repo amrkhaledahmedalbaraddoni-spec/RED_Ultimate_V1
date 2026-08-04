@@ -25,11 +25,7 @@ const SecurityTab: React.FC = () => {
             .catch(() => message.error('Failed'));
     };
 
-    const securityEvents = [
-        { key: '1', event: 'Failed login attempt', user: 'user-789', time: '3 min ago', severity: 'warning' },
-        { key: '2', event: 'New device registered', user: 'user-123', time: '15 min ago', severity: 'info' },
-        { key: '3', event: 'Session expired', user: 'user-456', time: '1 hour ago', severity: 'info' },
-    ];
+    const securityEvents: any[] = []; // Populated only when the audit-log API is connected.
 
     return (
         <div>
@@ -44,25 +40,25 @@ const SecurityTab: React.FC = () => {
             <Row gutter={[16, 16]}>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Threat Level" value="LOW" prefix={<SafetyOutlined />}
+                        <Statistic title="Threat Level" value="UNKNOWN" prefix={<SafetyOutlined />}
                             valueStyle={{ color: '#52c41a' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Blocked Devices" value={0} prefix={<LockOutlined />}
+                        <Statistic title="Blocked Devices" value="—" prefix={<LockOutlined />}
                             valueStyle={{ color: '#ff4d4f' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Active Sessions" value={12} prefix={<SafetyOutlined />}
+                        <Statistic title="Active Sessions" value="—" prefix={<SafetyOutlined />}
                             valueStyle={{ color: '#1890ff' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Security Score" value={95} suffix="/100"
+                        <Statistic title="Security Score" value="N/A"
                             prefix={<SafetyOutlined />} valueStyle={{ color: '#52c41a' }} />
                     </Card>
                 </Col>

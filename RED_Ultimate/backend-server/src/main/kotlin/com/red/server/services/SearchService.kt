@@ -14,7 +14,7 @@ class SearchService(private val mongoTemplate: MongoTemplate) {
      * بحث نصي شامل في أرشيف الرسائل المشفرة
      */
     fun searchInConversation(conversationId: String, keyword: String): List<MessageDocument> {
-        val criteria = Criteria.where("conversationId").is(conversationId)
+        val criteria = Criteria.where("conversationId").`is`(conversationId)
         val textCriteria = TextCriteria.forDefaultLanguage().matchingAny(keyword)
         
         val query = Query(criteria).addCriteria(textCriteria).limit(50)

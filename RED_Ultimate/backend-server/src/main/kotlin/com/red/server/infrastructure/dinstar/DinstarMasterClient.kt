@@ -1,46 +1,18 @@
 package com.red.server.infrastructure.dinstar
 
+import com.red.server.services.DinstarHardwareService
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestTemplate
-import org.springframework.beans.factory.annotation.Value
 
+/**
+ * Compatibility facade for dashboard endpoints. All values come from the real
+ * authenticated DINSTAR hardware service; no generated signal, operator or IMEI data.
+ */
 @Service
-class DinstarMasterClient(private val restTemplate: RestTemplate) {
+class DinstarMasterClient(private val hardware: DinstarHardwareService) {
+    fun getPortsRealtimeStatus(): List<Map<String, Any>> = hardware.getHardwareStatus()
 
-    @Value("\${red.dinstar.ip}")
-    private lateinit var deviceIp: String
-
-    @Value("\${red.dinstar.auth-token}")
-    private lateinit var authToken: String
-
-    /**
-     * جلب الحالة الحية للشرائح الـ 8 عبر HTTP REST الخاص بـ Dinstar
-     */
-    fun getPortsRealtimeStatus(): List<SimSlotInfo> {
-        val url = "http://$deviceIp/api/get_port_info"
-        // في بيئة التشغيل الفعلية نرسل الطلب للجهاز
-        // val response = restTemplate.getForEntity(url, DinstarResponse::class.java)
-        
-        return (0..7).map { i ->
-            SimSlotInfo(
-                index = i,
-                status = if (i % 2 == 0) "IDLE" else "BUSY",
-                signal = (70..95).random(),
-                operator = "Yemen Mobile",
-                imei = "8642210455${i}123"
-            )
-        }
-    }
-
-    fun restartPort(slotIndex: Int) {
-        println("🔴 RED Master: Restarting SIM Slot $slotIndex on Dinstar UC2000...")
-    }
+    fun restartPort(slotIndex: Int): Nothing =
+        throw UnsupportedOperationException(
+            "The configured DINSTAR API does not expose a verified per-port restart operation (slot $slotIndex)"
+        )
 }
-
-data class SimSlotInfo(
-    val index: Int,
-    val status: String,
-    val signal: Int,
-    val operator: String,
-    val imei: String
-)

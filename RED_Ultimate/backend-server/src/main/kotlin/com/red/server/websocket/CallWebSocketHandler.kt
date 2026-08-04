@@ -1,33 +1,43 @@
 package com.red.server.websocket
 
-import com.red.sovereign.proto.CallProtos
-import org.springframework.web.socket.BinaryMessage
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.stereotype.Component
+import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
-import org.springframework.web.socket.handler.BinaryWebSocketHandler
+import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * RED Master Call REDer
- * Connects Caller to Callee and SFU.
+ * Routes WebRTC signaling envelopes. Media remains end-to-end WebRTC/SFU;
+ * this handler never inspects SDP content beyond routing metadata.
  */
-class CallWebSocketHandler : BinaryWebSocketHandler() {
+@Component
+class CallWebSocketHandler(private val objectMapper: ObjectMapper) : TextWebSocketHandler() {
     private val sessions = ConcurrentHashMap<String, WebSocketSession>()
 
-    override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
-        val signal = CallProtos.CallRED.parseFrom(message.payload.array())
-        val targetSession = sessions[signal.targetUserId]
-
-        if (targetSession != null && targetSession.isOpen) {
-            // Forward the binary signal to the target user (System A Flow)
-            targetSession.sendMessage(BinaryMessage(message.payload.array()))
-            println("🔴 RED: REDing ${signal.type} forwarded to ${signal.targetUserId}")
-        } else {
-            println("⚠️ RED: Target user ${signal.targetUserId} is offline.")
-        }
+    override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
+        val signal = objectMapper.readValue(message.payload, CallSignal::class.java)
+        require(signal.targetUserId.isNotBlank()) { "targetUserId is required" }
+        sessions[signal.targetUserId]
+            ?.takeIf { it.isOpen }
+            ?.sendMessage(message)
     }
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
-        val userId = session.attributes["userId"] as String
+        val userId = session.attributes["userId"] as? String ?: return
         sessions[userId] = session
     }
+
+    override fun afterConnectionClosed(
+        session: WebSocketSession,
+        status: org.springframework.web.socket.CloseStatus
+    ) {
+        sessions.entries.removeIf { it.value.id == session.id }
+    }
 }
+
+data class CallSignal(
+    val targetUserId: String = "",
+    val type: String = "",
+    val payload: Map<String, Any?> = emptyMap()
+)

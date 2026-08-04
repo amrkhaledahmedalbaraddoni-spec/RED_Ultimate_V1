@@ -1,41 +1,59 @@
 package com.red.server.controllers
 
+import com.red.server.auth.ApprovalActionRequest
 import com.red.server.auth.RedApprovalService
 import com.red.server.services.CoreService
-import org.springframework.web.bind.annotation.*
+import com.red.server.services.RedSecurityService
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/admin")
 class AdminController(
     private val approvalService: RedApprovalService,
-    private val coreService: CoreService
+    private val coreService: CoreService,
+    private val securityService: RedSecurityService
 ) {
-
-    // 1. جلب قائمة الانتظار
     @GetMapping("/users/pending")
     fun getPendingUsers() = ResponseEntity.ok(approvalService.getPendingList())
 
-    // 2. الموافقة أو الحظر
-    @PostMapping("/users/update-status")
-    fun updateUserStatus(@RequestParam userId: String, @RequestParam status: String): ResponseEntity<Any> {
-        when (status) {
-            "APPROVED" -> approvalService.approveUser(userId)
-            "BANNED" -> approvalService.banUser(userId)
-            "REJECTED" -> approvalService.rejectUser(userId)
-        }
-        return ResponseEntity.ok(mapOf("status" to "SUCCESS"))
-    }
+    @PostMapping("/users/action")
+    fun updateUserStatus(
+        @RequestBody request: ApprovalActionRequest,
+        authentication: Authentication
+    ) = ResponseEntity.ok(
+        approvalService.processAction(
+            userId = request.userId,
+            action = request.action,
+            reason = request.reason,
+            adminId = UUID.fromString(authentication.name)
+        )
+    )
 
-    // 3. مراقبة القصص النشطة
+    @PostMapping("/users/update-status")
+    fun legacyUpdateUserStatus(
+        @RequestParam userId: String,
+        @RequestParam status: String,
+        authentication: Authentication
+    ) = ResponseEntity.ok(
+        approvalService.processAction(
+            UUID.fromString(userId),
+            com.red.server.auth.model.AccountStatus.valueOf(status.uppercase()),
+            adminId = UUID.fromString(authentication.name)
+        )
+    )
+
     @GetMapping("/stories/monitor")
     fun monitorStories() = ResponseEntity.ok(coreService.getActiveStoriesCount())
 
-    // 4. مفتاح القتل (Security Kill Switch)
     @PostMapping("/security/kill-switch")
-    fun activateKillSwitch(@RequestParam userId: String): ResponseEntity<Any> {
-        // إرسال أمر مسح البيانات للجهاز عبر WebSocket
-        println("⚠️ RED Master Security: Remote Wipe triggered for $userId")
-        return ResponseEntity.ok(mapOf("action" to "WIPE_SIGNAL_SENT"))
-    }
+    fun activateKillSwitch(@RequestParam userId: String) =
+        ResponseEntity.ok(securityService.sendWipeSignal(userId))
 }

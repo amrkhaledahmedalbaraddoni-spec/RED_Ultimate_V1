@@ -1,5 +1,6 @@
 package com.red.server.services
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 import org.springframework.http.*
@@ -11,16 +12,21 @@ import java.util.Collections
  * Fully implemented with real network requests, auto-discovery, and error-resilient fallbacks.
  */
 @Service
-class DinstarHardwareService {
+class DinstarHardwareService(
+    @Value("\${red.dinstar.ip}") configuredIp: String,
+    @Value("\${red.dinstar.port:80}") configuredPort: Int,
+    @Value("\${red.dinstar.username:}") private val gatewayUsername: String,
+    @Value("\${red.dinstar.password:}") private val gatewayPassword: String
+) {
     private val restTemplate = RestTemplate()
-    private var activeDeviceUrl = "http://192.168.1.100" // Dynamic or auto-discovered
-    private val gatewayUsername = "admin"
-    private val gatewayPassword = "admin"
+    private var activeDeviceUrl = "http://$configuredIp:$configuredPort"
 
     private fun createAuthHeaders(): HttpHeaders {
         val headers = HttpHeaders()
         headers.accept = Collections.singletonList(MediaType.APPLICATION_JSON)
-        // Basic auth encoding or standard header if supported by Dinstar API
+        require(gatewayUsername.isNotBlank() && gatewayPassword.isNotBlank()) {
+            "DINSTAR_USERNAME and DINSTAR_PASSWORD must be configured"
+        }
         headers.setBasicAuth(gatewayUsername, gatewayPassword)
         return headers
     }
@@ -62,14 +68,12 @@ class DinstarHardwareService {
             }
         }
         
-        // Fallback to standard configured IP if network scan is isolated
-        println("⚠️ AQYAL Discovery: Direct probe unreached, falling back to configured gateway: $activeDeviceUrl")
         return mapOf(
-            "success" to true,
-            "gateway_ip" to "192.168.1.100",
+            "success" to false,
             "url" to activeDeviceUrl,
             "model" to "UC2000-VE-8T",
-            "status" to "FALLBACK_CONNECTED"
+            "status" to "OFFLINE",
+            "message" to "No DINSTAR gateway responded to an authenticated status probe"
         )
     }
 
@@ -82,22 +86,9 @@ class DinstarHardwareService {
             val entity = HttpEntity<String>(createAuthHeaders())
             val response = restTemplate.exchange(url, HttpMethod.GET, entity, List::class.java)
             @Suppress("UNCHECKED_CAST")
-            response.body as? List<Map<String, Any>> ?: fallbackPorts()
+            response.body as? List<Map<String, Any>> ?: emptyList()
         } catch (e: Exception) {
-            println("⚠️ AQYAL Hardware Warning: Failed to fetch live Dinstar status, using synced state. Error: ${e.message}")
-            fallbackPorts()
-        }
-    }
-
-    private fun fallbackPorts(): List<Map<String, Any>> {
-        return (0..7).map { i ->
-            mapOf(
-                "index" to i,
-                "status" to "READY",
-                "signal" to 85,
-                "operator" to if (i % 2 == 0) "Yemen Mobile" else "Sabafon",
-                "sim_number" to "+9677712345${i}"
-            )
+            emptyList()
         }
     }
 
@@ -145,15 +136,7 @@ class DinstarHardwareService {
             println("🔴 AQYAL PSTN Master: Successfully dispatched call to $phoneNumber via Dinstar Slot $slotIndex")
             return response.body ?: mapOf("status" to "DIALING", "target" to phoneNumber, "slot" to slotIndex)
         } catch (e: Exception) {
-            println("⚠️ AQYAL PSTN Master Warning: Dinstar direct API call dispatch failed, routing via Asterisk AMI fallback. Error: ${e.message}")
-            // Return successful simulated execution payload for resilient voice switching
-            return mapOf(
-                "status" to "DISPATCHED_VIA_ASTERISK",
-                "target" to phoneNumber,
-                "slot" to slotIndex,
-                "gateway" to activeDeviceUrl,
-                "message" to "Call routed through Asterisk PJSIP trunk successfully."
-            )
+            throw IllegalStateException("DINSTAR rejected or did not receive the call request", e)
         }
     }
 }

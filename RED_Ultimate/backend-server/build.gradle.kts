@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.0"
     kotlin("plugin.spring") version "2.1.0"
+    kotlin("plugin.jpa") version "2.1.0"
     id("org.springframework.boot") version "3.4.0"
     id("io.spring.dependency-management") version "1.1.7"
 }
@@ -39,8 +40,11 @@ dependencies {
     // PSTN / Asterisk
     implementation("org.asteriskjava:asterisk-java:3.40.0")
 
-    // Protobuf
-    implementation("com.google.protobuf:protobuf-java:3.25.1")
+    // One authoritative RED protocol shared by Android and the backend
+    implementation(project(":shared-proto"))
+
+    // Argon2id password hashing
+    implementation("org.bouncycastle:bcprov-jdk18on:1.79")
 
     // OkHttp for Dinstar API
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

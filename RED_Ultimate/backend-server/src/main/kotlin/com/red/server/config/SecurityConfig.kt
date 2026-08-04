@@ -1,51 +1,62 @@
 package com.red.server.config
 
+import com.red.server.auth.security.JwtAuthenticationFilter
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
+import org.springframework.security.config.http.SessionCreationPolicy
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
-/**
- * RED Sovereign Security Configuration
- * TODO: Implement proper JWT authentication for production
- */
 @Configuration
-@EnableWebSecurity
-class SecurityConfig {
+class SecurityConfig(
+    private val jwtFilter: JwtAuthenticationFilter,
+    @Value("\${red.security.allowed-origins:http://localhost,http://127.0.0.1}")
+    private val allowedOrigins: String
+) {
+    @Bean
+    fun passwordEncoder(): PasswordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
-            .csrf { it.disable() }.authorizeHttpRequests { auth -> auth.requestMatchers("/api/**").authenticated().anyRequest().authenticated() } // TODO: Enable CSRF for production with proper token management
+            .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/api/master/v1/auth/**").permitAll()
-                    .requestMatchers("/actuator/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                    .requestMatchers("/health", "/actuator/health").permitAll()
                     .requestMatchers("/ws/**").permitAll()
-                    .requestMatchers("/health").permitAll()
-                    .requestMatchers("/api/**").permitAll() // TODO: Restrict in production
+                    .requestMatchers("/api/admin/**", "/api/master/admin/**", "/api/master/v1/auth/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers("/api/**").authenticated()
                     .anyRequest().authenticated()
             }
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
 
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
-        val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf("*")
-        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("*")
-        configuration.allowCredentials = false
-
-        val source = UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/**", configuration)
-        return source
+        val configuration = CorsConfiguration().apply {
+            allowedOriginPatterns = allowedOrigins.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            allowedHeaders = listOf("Authorization", "Content-Type", "X-Requested-With")
+            exposedHeaders = listOf("Location")
+            allowCredentials = true
+            maxAge = 3600
+        }
+        return UrlBasedCorsConfigurationSource().also {
+            it.registerCorsConfiguration("/**", configuration)
+        }
     }
 }

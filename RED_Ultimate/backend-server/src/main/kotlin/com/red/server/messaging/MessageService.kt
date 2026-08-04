@@ -71,12 +71,8 @@ class MessageService(
         )
         mongoTemplate.save(message)
 
-        // 4. Update presence
-        redisTemplate.opsForValue().set(
-            "red:presence:$senderId",
-            "online",
-            java.time.Duration.ofMinutes(5)
-        )
+        // 4. Update a timestamped presence index (no Redis KEYS scan).
+        redisTemplate.opsForZSet().add("red:presence:index", senderId, System.currentTimeMillis().toDouble())
 
         // 5. Notify via Redis pub/sub
         redisTemplate.convertAndSend(

@@ -1,0 +1,50 @@
+package com.red.server.pstn
+
+import com.red.server.auth.model.AccountStatus
+import com.red.server.auth.repository.UserAccountRepository
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.stereotype.Service
+import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+
+@Service
+class PstnCallService(
+    private val users: UserAccountRepository,
+    private val redis: StringRedisTemplate,
+    private val pstn: PstnManager
+) {
+    fun dial(userId: UUID, suppliedNumber: String): PstnCallResponse {
+        val user = users.findById(userId).orElseThrow { NoSuchElementException("User not found") }
+        require(user.status == AccountStatus.APPROVED) { "Account is not approved" }
+        require(user.pstnEnabled && user.pstnDailyLimit > 0) { "PSTN access is not enabled for this account" }
+        val number = normalizeYemeniNumber(suppliedNumber)
+        val day = LocalDate.now(ZoneId.of("Asia/Aden"))
+        val key = "red:pstn:daily:${user.id}:$day"
+        val used = redis.opsForValue().increment(key) ?: 1L
+        if (used == 1L) redis.expire(key, Duration.ofDays(2))
+        require(used <= user.pstnDailyLimit) { "Daily PSTN call limit reached" }
+
+        return runCatching { PstnCallResponse(pstn.dialGsm(number), "DIALING", number, used.toInt(), user.pstnDailyLimit) }
+            .getOrElse {
+                redis.opsForValue().decrement(key)
+                throw IllegalStateException("Asterisk rejected the PSTN call", it)
+            }
+    }
+
+    private fun normalizeYemeniNumber(value: String): String {
+        val compact = value.filter { it.isDigit() || it == '+' }
+        val local = when {
+            compact.startsWith("+967") -> compact.removePrefix("+967")
+            compact.startsWith("00967") -> compact.removePrefix("00967")
+            compact.startsWith("967") -> compact.removePrefix("967")
+            compact.startsWith("0") -> compact.removePrefix("0")
+            else -> compact
+        }
+        require(local.matches(Regex("^[0-9]{6,12}$"))) { "Only valid Yemeni numbers are allowed" }
+        return local
+    }
+}
+
+data class PstnCallResponse(val callId: String, val status: String, val number: String, val usedToday: Int, val dailyLimit: Int)

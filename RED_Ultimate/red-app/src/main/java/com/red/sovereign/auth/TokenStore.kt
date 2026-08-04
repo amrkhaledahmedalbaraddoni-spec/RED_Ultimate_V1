@@ -10,12 +10,14 @@ class TokenStore(context: Context) {
     val deviceId get() = store.get("device_id")
     val redId get() = store.get("red_id")
     val username get() = store.get("username")
+    val pstnEnabled get() = store.get("pstn_enabled") == "true"
 
     fun rememberDevice(value: String) = store.put("device_id", value)
     fun save(response: AuthResponse) {
         store.put("access", response.accessToken); store.put("refresh", response.refreshToken)
         response.deviceId?.let(::rememberDevice)
         store.put("red_id", response.user.redId); store.put("username", response.user.username)
+        store.put("pstn_enabled", response.user.pstnEnabled.toString())
     }
     fun updateTokens(response: RefreshResponse) { store.put("access", response.accessToken); store.put("refresh", response.refreshToken) }
     fun clearSession() = store.remove("access", "refresh", "red_id", "username")

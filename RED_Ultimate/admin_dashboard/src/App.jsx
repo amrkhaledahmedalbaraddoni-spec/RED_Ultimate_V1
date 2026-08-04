@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import Dashboard from './pages/Dashboard';
 import MasterOverview from './pages/MasterOverview';
-import AuthorityTab from './pages/tabs/AuthorityTab';
+import UserManagement from './pages/UserManagement';
 import MasterLayout from './pages/MasterLayout';
 import DinstarControl from './pages/DinstarControl';
 import Diagnostics from './pages/Diagnostics';
@@ -40,7 +40,7 @@ function App() {
         switch (currentPage) {
             case 'dashboard': return <Dashboard />;
             case 'master': return <MasterLayout />;
-            case 'users': return <AuthorityTab />;
+            case 'users': return <UserManagement />;
             case 'dinstar': return <DinstarControl />;
             case 'monitor': return <MasterOverview />;
             case 'diagnostics': return <Diagnostics />;

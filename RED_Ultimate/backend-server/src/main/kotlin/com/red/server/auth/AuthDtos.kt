@@ -50,6 +50,8 @@ data class UserAccountResponse(
     val createdAt: Instant,
     val updatedAt: Instant,
     val rejectionReason: String?,
+    val pstnEnabled: Boolean,
+    val pstnDailyLimit: Int,
     val devices: List<DeviceResponse> = emptyList()
 )
 
@@ -92,6 +94,8 @@ fun UserAccount.toResponse(devices: List<UserDevice> = emptyList()) = UserAccoun
     createdAt = createdAt,
     updatedAt = updatedAt,
     rejectionReason = rejectionReason,
+    pstnEnabled = pstnEnabled,
+    pstnDailyLimit = pstnDailyLimit,
     devices = devices.map { it.toResponse() }
 )
 

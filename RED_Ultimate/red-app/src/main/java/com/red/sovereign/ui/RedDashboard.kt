@@ -23,8 +23,11 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -32,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
+import com.red.sovereign.auth.PstnState
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
@@ -65,7 +70,7 @@ fun RedDashboard(state: AuthState.Authenticated, viewModel: AuthViewModel) {
             when (selected) {
                 0 -> HomeTab()
                 1 -> ChatsTab()
-                2 -> CallsTab()
+                2 -> CallsTab(state, viewModel)
                 3 -> ExploreTab()
                 else -> SettingsTab(state, viewModel::logout)
             }
@@ -83,15 +88,32 @@ fun RedDashboard(state: AuthState.Authenticated, viewModel: AuthViewModel) {
     }
 }
 
-@Composable private fun CallsTab() = Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    Text("طرق الاتصال", fontSize = 23.sp, fontWeight = FontWeight.Bold)
-    Text("اختر المسار بوضوح؛ الفيديو لا يمر عبر شريحة DINSTAR.")
-    CallAction("صوت RED", "WebRTC مشفر داخل التطبيق", Icons.Default.Call, AqyalCyanGlow)
-    CallAction("فيديو RED", "WebRTC عبر SFU المحلي", Icons.Default.Videocam, AqyalCyanGlow)
-    CallAction("اتصال يمني", "صوت فقط عبر Asterisk وDINSTAR", Icons.Default.SimCard, AqyalGold)
+@Composable private fun CallsTab(account: AuthState.Authenticated, viewModel: AuthViewModel) {
+    var showDialer by remember { mutableStateOf(false) }
+    var number by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("طرق الاتصال", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Text("اختر المسار بوضوح؛ الفيديو لا يمر عبر شريحة DINSTAR.")
+        CallAction("صوت RED", "WebRTC مشفر داخل التطبيق — قيد ربط محرك الوسائط", Icons.Default.Call, AqyalCyanGlow, false, {})
+        CallAction("فيديو RED", "WebRTC عبر SFU المحلي — قيد ربط محرك الوسائط", Icons.Default.Videocam, AqyalCyanGlow, false, {})
+        CallAction("اتصال يمني", if (account.pstnEnabled) "صوت عبر Asterisk وDINSTAR" else "يتطلب تفعيل المسؤول", Icons.Default.SimCard, AqyalGold, account.pstnEnabled) { showDialer = true }
+        when (val status = viewModel.pstnState) {
+            PstnState.Dialing -> CircularProgressIndicator(color = AqyalGold)
+            is PstnState.Started -> Text("بدأ الاتصال — الاستخدام اليومي ${status.usedToday}/${status.dailyLimit}", color = AqyalGold)
+            is PstnState.Error -> Text(status.message, color = MaterialTheme.colorScheme.error)
+            PstnState.Idle -> Unit
+        }
+    }
+    if (showDialer) AlertDialog(
+        onDismissRequest = { showDialer = false },
+        title = { Text("اتصال يمني صوتي") },
+        text = { OutlinedTextField(number, { number = it.filter { c -> c.isDigit() || c == '+' } }, label = { Text("الرقم اليمني") }, singleLine = true) },
+        confirmButton = { Button({ showDialer = false; viewModel.dialPstn(number) }, enabled = number.length >= 6) { Text("اتصال") } },
+        dismissButton = { OutlinedButton({ showDialer = false }) { Text("إلغاء") } }
+    )
 }
 
-@Composable private fun CallAction(title: String, description: String, icon: ImageVector, color: Color) = Card(Modifier.fillMaxWidth()) { Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Column(Modifier.weight(1f).padding(horizontal = 14.dp)) { Text(title, fontWeight = FontWeight.Bold); Text(description, color = Color.Gray) }; Button({}) { Text("فتح") } } }
+@Composable private fun CallAction(title: String, description: String, icon: ImageVector, color: Color, enabled: Boolean, action: () -> Unit) = Card(Modifier.fillMaxWidth()) { Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Column(Modifier.weight(1f).padding(horizontal = 14.dp)) { Text(title, fontWeight = FontWeight.Bold); Text(description, color = Color.Gray) }; Button(action, enabled = enabled) { Text(if (enabled) "فتح" else "قريباً") } } }
 
 @Composable private fun ExploreTab() = Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Text("استكشاف", fontSize = 23.sp, fontWeight = FontWeight.Bold)

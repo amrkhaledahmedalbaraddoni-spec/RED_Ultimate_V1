@@ -11,4 +11,5 @@ interface UserAccountRepository : JpaRepository<UserAccount, UUID> {
     fun existsByUsernameIgnoreCase(username: String): Boolean
     fun existsByRedId(redId: String): Boolean
     fun findAllByStatusOrderByCreatedAtAsc(status: AccountStatus): List<UserAccount>
+    fun findAllByOrderByCreatedAtDesc(): List<UserAccount>
 }

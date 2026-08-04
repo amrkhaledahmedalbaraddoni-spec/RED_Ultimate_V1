@@ -51,7 +51,13 @@ class UserAccount(
     var rejectionReason: String? = null,
 
     @Column(name = "last_seen")
-    var lastSeen: Long? = null
+    var lastSeen: Long? = null,
+
+    @Column(name = "pstn_enabled", nullable = false)
+    var pstnEnabled: Boolean = false,
+
+    @Column(name = "pstn_daily_limit", nullable = false)
+    var pstnDailyLimit: Int = 0
 )
 
 enum class AccountStatus {

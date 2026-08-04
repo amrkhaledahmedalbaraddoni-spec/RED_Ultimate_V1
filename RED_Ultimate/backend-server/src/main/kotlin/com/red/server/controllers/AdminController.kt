@@ -2,6 +2,9 @@ package com.red.server.controllers
 
 import com.red.server.auth.ApprovalActionRequest
 import com.red.server.auth.RedApprovalService
+import com.red.server.auth.repository.UserAccountRepository
+import com.red.server.auth.repository.UserDeviceRepository
+import com.red.server.auth.toResponse
 import com.red.server.services.CoreService
 import com.red.server.services.RedSecurityService
 import org.springframework.http.ResponseEntity
@@ -19,10 +22,17 @@ import java.util.UUID
 class AdminController(
     private val approvalService: RedApprovalService,
     private val coreService: CoreService,
-    private val securityService: RedSecurityService
+    private val securityService: RedSecurityService,
+    private val users: UserAccountRepository,
+    private val devices: UserDeviceRepository
 ) {
     @GetMapping("/users/pending")
     fun getPendingUsers() = ResponseEntity.ok(approvalService.getPendingList())
+
+    @GetMapping("/users")
+    fun getUsers() = users.findAllByOrderByCreatedAtDesc().map { user ->
+        user.toResponse(devices.findAllByUserIdOrderByCreatedAtAsc(user.id))
+    }
 
     @PostMapping("/users/action")
     fun updateUserStatus(

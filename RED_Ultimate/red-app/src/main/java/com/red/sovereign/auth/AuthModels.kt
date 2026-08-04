@@ -37,6 +37,8 @@ data class UserResponse(
     val status: String,
     val role: String,
     val rejectionReason: String? = null,
+    val pstnEnabled: Boolean = false,
+    val pstnDailyLimit: Int = 0,
     val devices: List<DeviceResponse> = emptyList()
 )
 

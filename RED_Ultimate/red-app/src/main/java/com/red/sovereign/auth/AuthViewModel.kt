@@ -14,6 +14,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val api = AuthApi()
     private val tokens = TokenStore(application)
     private val keys = DeviceKeyManager(application)
+    private val pstn = PstnApi(tokens)
+
+    var pstnState: PstnState by mutableStateOf(PstnState.Idle)
+        private set
 
     var state: AuthState by mutableStateOf(AuthState.Loading)
         private set
@@ -53,6 +57,16 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         else login(credentials.first, credentials.second)
     }
 
+    fun dialPstn(number: String) = viewModelScope.launch {
+        pstnState = PstnState.Dialing
+        pstnState = when (val result = pstn.dial(number)) {
+            is ApiResult.Success -> PstnState.Started(result.value.callId, result.value.usedToday, result.value.dailyLimit)
+            is ApiResult.Error -> PstnState.Error(localize(result.message))
+        }
+    }
+
+    fun clearPstnState() { pstnState = PstnState.Idle }
+
     fun logout() {
         tokens.clearSession()
         pendingCredentials = null
@@ -65,7 +79,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         when (val result = api.refresh(refresh)) {
             is ApiResult.Success -> {
                 tokens.updateTokens(result.value)
-                state = AuthState.Authenticated(tokens.redId.orEmpty(), tokens.username.orEmpty())
+                state = AuthState.Authenticated(tokens.redId.orEmpty(), tokens.username.orEmpty(), tokens.pstnEnabled)
             }
             is ApiResult.Error -> { tokens.clearSession(); state = AuthState.Welcome }
         }
@@ -76,7 +90,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             "APPROVED" -> {
                 tokens.save(response)
                 pendingCredentials = null
-                state = AuthState.Authenticated(response.user.redId, response.user.username)
+                state = AuthState.Authenticated(response.user.redId, response.user.username, response.user.pstnEnabled)
             }
             "PENDING" -> {
                 pendingCredentials = username to password
@@ -103,9 +117,16 @@ sealed interface AuthState {
     data object Login : AuthState
     data object Submitting : AuthState
     data class Pending(val redId: String, val username: String) : AuthState
-    data class Authenticated(val redId: String, val username: String) : AuthState
+    data class Authenticated(val redId: String, val username: String, val pstnEnabled: Boolean) : AuthState
     data class Rejected(val reason: String?) : AuthState
     data object Suspended : AuthState
     data object Banned : AuthState
     data class Error(val message: String) : AuthState
+}
+
+sealed interface PstnState {
+    data object Idle : PstnState
+    data object Dialing : PstnState
+    data class Started(val callId: String, val usedToday: Int, val dailyLimit: Int) : PstnState
+    data class Error(val message: String) : PstnState
 }

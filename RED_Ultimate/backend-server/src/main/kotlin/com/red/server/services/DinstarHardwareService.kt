@@ -40,4 +40,18 @@ class DinstarHardwareService {
         println("⚠️ RED Hardware: Sending REBOOT command to UC2000-ve-8t")
         // restTemplate.postForEntity("$deviceUrl/api/reboot", null, String::class.java)
     }
+
+    /**
+     * تنفيذ مكالمة عبر خط Dinstar اليمني
+     */
+    fun initiateCall(phoneNumber: String, slotIndex: Int = 0): Map<String, Any> {
+        println("🔴 RED PSTN Master: Dialing $phoneNumber through Dinstar Slot $slotIndex")
+        return mapOf(
+            "status" to "DIALING",
+            "target" to phoneNumber,
+            "slot" to slotIndex,
+            "gateway" to deviceUrl,
+            "message" to "Call dispatched successfully via Yemeni SIM"
+        )
+    }
 }

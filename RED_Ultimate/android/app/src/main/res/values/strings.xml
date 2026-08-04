@@ -1,6 +1,3 @@
 <resources>
-    <string name="app_name">RED</string>
-    <string name="welcome_message">Welcome to RED</string>
-    <string name="rights_reserved">© 2026 RED. All Rights Reserved.</string>
-    <string name="admin_approval_pending">RED: Access Restricted. Pending Admin Approval.</string>
+    <string name="app_name">AQYAL Sovereign (أقيال)</string>
 </resources>

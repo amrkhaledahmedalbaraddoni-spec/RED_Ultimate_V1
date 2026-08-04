@@ -18,6 +18,15 @@ class DinstarController(private val dinstarService: DinstarHardwareService) {
     }
 
     /**
+     * الاكتشاف الذكي لبوابة DINSTAR في الشبكة المحلية
+     */
+    @GetMapping("/discover")
+    fun discoverGateway(): ResponseEntity<Any> {
+        val result = dinstarService.discoverGateway()
+        return ResponseEntity.ok(result)
+    }
+
+    /**
      * أمر إعادة تشغيل الهاردوير
      */
     @PostMapping("/reboot")
@@ -34,5 +43,16 @@ class DinstarController(private val dinstarService: DinstarHardwareService) {
         val newIp = data["sip_ip"] ?: return ResponseEntity.badRequest().build()
         dinstarService.updateSipSettings(newIp)
         return ResponseEntity.ok(mapOf("status" to "SUCCESS"))
+    }
+
+    /**
+     * بدء مكالمة PSTN عبر خط Dinstar من تطبيق الأندرويد
+     */
+    @PostMapping("/dial")
+    fun dialNumber(@RequestBody body: Map<String, Any>): ResponseEntity<Any> {
+        val number = body["number"] as? String ?: return ResponseEntity.badRequest().body(mapOf("error" to "Number required"))
+        val slot = (body["slot"] as? Number)?.toInt() ?: 0
+        val result = dinstarService.initiateCall(number, slot)
+        return ResponseEntity.ok(result)
     }
 }

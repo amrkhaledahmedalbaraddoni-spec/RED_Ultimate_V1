@@ -91,6 +91,8 @@ import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
 import com.red.sovereign.calls.CallHistoryItem
 import com.red.sovereign.calls.CallHistoryViewModel
+import com.red.sovereign.groups.GroupState
+import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -118,6 +120,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     val feed: FeedViewModel = viewModel()
     val stories: StoryViewModel = viewModel()
+    val groups: GroupViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -149,7 +152,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
                 MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                MainSection.CHATS -> ChatHubScreen()
+                MainSection.CHATS -> ChatHubScreen(groups)
                 MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
                 MainSection.CREATE -> Unit
@@ -262,13 +265,29 @@ private fun PostCard(post: Post, currentRedId: String, onLike: (Post) -> Unit, o
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
-private fun ChatHubScreen() {
+private fun ChatHubScreen(groups: GroupViewModel) {
     var tab by remember { mutableIntStateOf(0) }
+    var create by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         TabRow(tab) { Tab(tab == 0, { tab = 0 }, text = { Text("الخاص") }, icon = { Icon(Icons.Default.Chat, null) }); Tab(tab == 1, { tab = 1 }, text = { Text("المجموعات") }, icon = { Icon(Icons.Default.Groups, null) }) }
         if (tab == 0) EmptyState(Icons.Default.Chat, "المحادثات الخاصة", "محادثات RED المشفرة ستظهر هنا بعد اكتمال مخزن جلسات libsignal.")
-        else EmptyState(Icons.Default.Groups, "المجموعات", "أنشئ مجموعات محلية بأدوار مالك ومسؤول وعضو، ومكالمات جماعية مستقلة.")
+        else Column(Modifier.fillMaxSize().padding(14.dp)) {
+            Button({ create = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Text(" إنشاء مجموعة") }
+            when {
+                groups.state == GroupState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(30.dp))
+                groups.state is GroupState.Error -> EmptyState(Icons.Default.Groups, "تعذر تحميل المجموعات", (groups.state as GroupState.Error).message)
+                groups.groups.isEmpty() -> EmptyState(Icons.Default.Groups, "لا توجد مجموعات", "أنشئ مجموعة محلية بأدوار مالك ومسؤول وعضو.")
+                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f).padding(top = 12.dp)) {
+                    items(groups.groups, key = { it.id }) { group -> Card(Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Avatar(group.name.take(1)); Column(Modifier.padding(horizontal = 12.dp)) { Text(group.name, fontWeight = FontWeight.Bold); Text("${group.members.size} أعضاء · ${group.description.orEmpty()}", color = Color.Gray, fontSize = 12.sp) } } } }
+                }
+            }
+        }
     }
+    if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة RED جديدة") },
+        text = { OutlinedTextField(name, { name = it }, label = { Text("اسم المجموعة") }, singleLine = true) },
+        confirmButton = { Button({ groups.create(name, null) { create = false; name = "" } }, enabled = name.trim().length >= 2 && groups.state != GroupState.Saving) { Text("إنشاء") } },
+        dismissButton = { OutlinedButton({ create = false }) { Text("إلغاء") } })
 }
 
 @Composable

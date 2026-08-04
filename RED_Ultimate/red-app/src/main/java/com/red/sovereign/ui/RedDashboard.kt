@@ -70,7 +70,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,9 +83,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
+import com.red.sovereign.social.FeedState
+import com.red.sovereign.social.FeedViewModel
+import com.red.sovereign.social.Post
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalRoyalBlue
@@ -100,15 +103,13 @@ private enum class MainSection(val label: String, val icon: ImageVector) {
     PHONE("الهاتف", Icons.Default.Dialpad)
 }
 
-private data class LocalPost(val author: String, val handle: String, val body: String, val audience: String = "عام محلي")
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     var section by remember { mutableStateOf(MainSection.FEED) }
     var showCreate by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
-    val posts = remember { mutableStateListOf<LocalPost>() }
+    val feed: FeedViewModel = viewModel()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -134,7 +135,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
         Column(Modifier.fillMaxSize().padding(padding)) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
-                MainSection.FEED -> FeedScreen(account, posts, onCreate = { showCreate = true })
+                MainSection.FEED -> FeedScreen(account, feed, onCreate = { showCreate = true })
                 MainSection.CHATS -> ChatHubScreen()
                 MainSection.CALLS -> UnifiedCallsScreen()
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
@@ -144,8 +145,9 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     }
 
     if (showCreate) CreateSheet(
+        publishing = feed.state == FeedState.Publishing,
         onDismiss = { showCreate = false },
-        onPost = { text -> posts.add(0, LocalPost("أنت", "@${account.username}", text)); showCreate = false }
+        onPost = { text -> feed.create(text) { showCreate = false } }
     )
     if (showSettings) SettingsSheet(account, viewModel::logout) { showSettings = false }
 }
@@ -162,7 +164,7 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
 }
 
 @Composable
-private fun FeedScreen(account: AuthState.Authenticated, posts: List<LocalPost>, onCreate: () -> Unit) {
+private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, onCreate: () -> Unit) {
     var filter by remember { mutableIntStateOf(0) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -173,7 +175,12 @@ private fun FeedScreen(account: AuthState.Authenticated, posts: List<LocalPost>,
         }
         item {
             Row(Modifier.padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("لك", "أتابعهم", "اليمن").forEachIndexed { i, title -> FilterChip(filter == i, { filter = i }, { Text(title) }) }
+                listOf("لك", "أتابعهم", "اليمن").forEachIndexed { i, title ->
+                    FilterChip(filter == i, {
+                        filter = i
+                        feed.load(if (i == 2) "LOCAL_YEMEN" else null)
+                    }, { Text(if (i == 1) "$title · قريباً" else title) }, enabled = i != 1)
+                }
             }
         }
         item {
@@ -183,9 +190,12 @@ private fun FeedScreen(account: AuthState.Authenticated, posts: List<LocalPost>,
                 }
             }
         }
-        if (posts.isEmpty()) {
-            item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. قريباً: سلاسل، اقتباس، استطلاع، صوت، صور وفيديو مشفر للجمهور الخاص.") }
-        } else items(posts) { PostCard(it) }
+        when {
+            feed.state == FeedState.Loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }
+            feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض RED", (feed.state as FeedState.Error).message) }
+            feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
+            else -> items(feed.posts, key = { it.id }) { PostCard(it, feed::toggleLike) }
+        }
         item { Spacer(Modifier.height(12.dp)) }
     }
 }
@@ -201,21 +211,28 @@ private fun StoryCircle(label: String, own: Boolean) = Column(horizontalAlignmen
 }
 
 @Composable
-private fun PostCard(post: LocalPost) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+private fun PostCard(post: Post, onLike: (Post) -> Unit) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
     Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(post.author.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) { Text(post.author, fontWeight = FontWeight.Bold); Text("${post.handle} · الآن", color = Color.Gray, fontSize = 12.sp) }
-            AssistChip({}, { Text(post.audience) }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) }); IconButton({}, enabled = false) { Icon(Icons.Default.MoreVert, null) }
+            Avatar(post.authorDisplayName.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                Text(post.authorDisplayName, fontWeight = FontWeight.Bold)
+                Text("@${post.authorUsername} · ${post.authorRedId}", color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            AssistChip({}, { Text(if (post.visibility == "LOCAL_YEMEN") "اليمن" else "عام") }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) })
         }
-        Text(post.body, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)
+        Text(post.text, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)
+        post.poll?.let { poll -> poll.options.forEach { option -> OutlinedButton({}, Modifier.fillMaxWidth(), enabled = false) { Text("${option.text} · ${option.votes}") } } }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-            PostAction(Icons.Default.FavoriteBorder, "إعجاب"); PostAction(Icons.Default.Chat, "رد"); PostAction(Icons.Default.Repeat, "اقتباس"); PostAction(Icons.Default.Share, "مشاركة")
+            PostAction(Icons.Default.FavoriteBorder, "${post.reactionCounts["LIKE"] ?: 0}", true) { onLike(post) }
+            PostAction(Icons.Default.Chat, post.replyCount.toString(), false) {}
+            PostAction(Icons.Default.Repeat, post.repostCount.toString(), false) {}
+            PostAction(Icons.Default.Share, "مشاركة", false) {}
         }
     }
 }
 
-@Composable private fun PostAction(icon: ImageVector, label: String) = TextButton({}, enabled = false) { Icon(icon, label, Modifier.size(18.dp)); Text(" $label", fontSize = 11.sp) }
+@Composable private fun PostAction(icon: ImageVector, label: String, enabled: Boolean, action: () -> Unit) = TextButton(action, enabled = enabled) { Icon(icon, label, Modifier.size(18.dp)); Text(" $label", fontSize = 11.sp) }
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
@@ -299,14 +316,14 @@ private fun DialPad(enabled: Boolean, viewModel: AuthViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateSheet(onDismiss: () -> Unit, onPost: (String) -> Unit) {
+private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (String) -> Unit) {
     var composer by remember { mutableStateOf(false) }; var text by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("إنشاء في RED", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             if (composer) {
                 OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().height(150.dp), placeholder = { Text("اكتب منشوراً، سلسلة، أو فكرة طويلة…") })
-                Button({ if (text.isNotBlank()) onPost(text.trim()) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank()) { Text("نشر محلي") }
+                Button({ if (text.isNotBlank()) onPost(text.trim()) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank() && !publishing) { if (publishing) CircularProgressIndicator(Modifier.size(20.dp)) else Text("نشر محلي") }
             } else {
                 CreateOption(Icons.Default.DynamicFeed, "منشور أو سلسلة", "نص طويل، اقتباس، استطلاع، صور وفيديو", true) { composer = true }
                 CreateOption(Icons.Default.AddCircle, "حالة 24 ساعة", "صورة أو فيديو قصير — قيد الربط", false) {}

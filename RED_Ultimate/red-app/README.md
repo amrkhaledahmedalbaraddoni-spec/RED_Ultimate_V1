@@ -36,4 +36,4 @@ RED-to-RED voice/video uses WebRTC and requires no SIM or phone number. DINSTAR 
 
 ## Current boundary
 
-Registration, approval, real libsignal enrollment keys, secure local secrets, rotating sessions, foreground WebSocket transport and authorized PSTN dialing are implemented. Full libsignal session stores, safety-number UI, encrypted message persistence, WebRTC/SFU media, synchronized social feed and MinIO stories remain gated work items; incomplete controls are visibly disabled.
+Registration, approval, real libsignal enrollment keys, secure local secrets, rotating sessions, foreground WebSocket transport, synchronized local/public feed and authorized PSTN dialing are implemented. The feed supports cursor pagination, threads/replies, quotes, polls and idempotent reactions at the API layer; following/media UI remains gated. Full libsignal session stores, safety-number UI, encrypted message persistence, WebRTC/SFU media and MinIO stories remain gated work items; incomplete controls are visibly disabled.

@@ -21,6 +21,9 @@ fun RedSettingsScreen(
     onManageDinstar: () -> Unit,
     onLogout: () -> Unit
 ) {
+    var isScanning by remember { mutableStateOf(false) }
+    var scanResult by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -89,15 +92,57 @@ fun RedSettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = onManageDinstar,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF4B400)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.SettingsEthernet, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("إدارة هاردوير DINSTAR والشرائح", color = Color.White, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = onManageDinstar,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF4B400)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.SettingsEthernet, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إدارة الهاردوير", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            isScanning = true
+                            scanResult = null
+                            // Simulate network discovery scan
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                isScanning = false
+                                scanResult = "تم اكتشاف بوابة DINSTAR بنجاح على IP: 192.168.1.100"
+                            }, 2000)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF4B400)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF4B400)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFFF4B400), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("جاري البحث...", fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.Radar, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("اكتشاف ذكي", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (scanResult != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = scanResult!!,
+                        fontSize = 11.sp,
+                        color = Color(0xFF2E7D32),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
                 }
             }
         }

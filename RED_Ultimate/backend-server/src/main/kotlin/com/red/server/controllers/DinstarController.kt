@@ -18,6 +18,15 @@ class DinstarController(private val dinstarService: DinstarHardwareService) {
     }
 
     /**
+     * الاكتشاف الذكي لبوابة DINSTAR في الشبكة المحلية
+     */
+    @GetMapping("/discover")
+    fun discoverGateway(): ResponseEntity<Any> {
+        val result = dinstarService.discoverGateway()
+        return ResponseEntity.ok(result)
+    }
+
+    /**
      * أمر إعادة تشغيل الهاردوير
      */
     @PostMapping("/reboot")

@@ -39,13 +39,18 @@ class RefreshTokenService(
     fun rotate(token: String): IssuedRefreshToken {
         val current = sessions.findByTokenHash(hash(token))
             ?: throw InvalidRefreshTokenException()
-        if (!current.isActive()) {
+        if (current.revokedAt != null) {
             // Reuse of a rotated token revokes the whole account session family.
             sessions.findAllByUserIdAndRevokedAtIsNull(current.user.id).forEach {
                 it.revokedAt = Instant.now()
                 sessions.save(it)
             }
             throw RefreshTokenReuseException()
+        }
+        if (!current.expiresAt.isAfter(Instant.now())) {
+            current.revokedAt = Instant.now()
+            sessions.save(current)
+            throw InvalidRefreshTokenException()
         }
 
         current.revokedAt = Instant.now()

@@ -1,12 +1,19 @@
 package com.red.sovereign
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
+import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.ui.AuthFlow
 import com.red.sovereign.ui.RedDashboard
 import com.red.sovereign.ui.theme.RedTheme
@@ -14,6 +21,7 @@ import com.red.sovereign.ui.theme.SovereignBackground
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,8 +30,15 @@ class MainActivity : ComponentActivity() {
             RedTheme {
                 SovereignBackground {
                     val state = authViewModel.state
-                    if (state is AuthState.Authenticated) RedDashboard(state, authViewModel)
-                    else AuthFlow(authViewModel)
+                    LaunchedEffect(state is AuthState.Authenticated) {
+                        if (state is AuthState.Authenticated) {
+                            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            RedConnectionService.start(this@MainActivity)
+                        } else RedConnectionService.stop(this@MainActivity)
+                    }
+                    if (state is AuthState.Authenticated) RedDashboard(state, authViewModel) else AuthFlow(authViewModel)
                 }
             }
         }

@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +51,9 @@ fun AuthFlow(viewModel: AuthViewModel) {
         AuthState.Loading, AuthState.Submitting -> LoadingScreen()
         AuthState.Welcome -> WelcomeScreen(viewModel::showRegister, viewModel::showLogin)
         AuthState.Register -> RegisterScreen(viewModel::register, viewModel::showWelcome)
-        AuthState.Login -> LoginScreen(viewModel::login, viewModel::showWelcome)
+        AuthState.Login -> LoginScreen(viewModel::login, viewModel::showRecovery, viewModel::showWelcome)
+        AuthState.Recovery -> RecoveryScreen(viewModel::recover, viewModel::showLogin)
+        AuthState.RecoveryComplete -> StatusScreen("تم تغيير كلمة المرور", "أُلغيت كل الجلسات القديمة. يمكنك تسجيل الدخول الآن.", viewModel::showLogin)
         is AuthState.Pending -> PendingScreen(state, viewModel::checkApproval, viewModel::showLogin)
         is AuthState.Rejected -> StatusScreen("تم رفض الطلب", state.reason ?: "راجع مسؤول منظومة RED المحلية", viewModel::showLogin)
         AuthState.Suspended -> StatusScreen("الحساب موقوف", "تواصل مع المسؤول المحلي", viewModel::showLogin)
@@ -90,12 +93,28 @@ private fun RegisterScreen(submit: (String, String, String) -> Unit, back: () ->
 }
 
 @Composable
-private fun LoginScreen(submit: (String, String) -> Unit, back: () -> Unit) {
+private fun LoginScreen(submit: (String, String) -> Unit, recovery: () -> Unit, back: () -> Unit) {
     var username by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }
     FormColumn("تسجيل الدخول") {
         Field(username, { username = it }, "اسم المستخدم", leading = { Icon(Icons.Default.Person, null) })
         PasswordField(password, { password = it }, "كلمة المرور")
         Button({ submit(username, password) }, Modifier.fillMaxWidth(), enabled = username.isNotBlank() && password.isNotBlank()) { Text("دخول") }
+        TextButton(recovery, Modifier.fillMaxWidth()) { Text("نسيت كلمة المرور؟ استخدم رمز الاستعادة") }
+        OutlinedButton(back, Modifier.fillMaxWidth()) { Text("رجوع") }
+    }
+}
+
+@Composable
+private fun RecoveryScreen(submit: (String, String, String) -> Unit, back: () -> Unit) {
+    var redId by remember { mutableStateOf("") }; var code by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
+    FormColumn("استعادة محلية") {
+        Text("لا نستخدم SMS أو بريداً. أدخل أحد الرموز التي حفظتها عند إنشاء الحساب.", textAlign = TextAlign.Center)
+        Field(redId, { redId = it.uppercase() }, "RED ID")
+        Field(code, { code = it.uppercase() }, "رمز الاستعادة")
+        PasswordField(password, { password = it }, "كلمة المرور الجديدة")
+        PasswordField(confirm, { confirm = it }, "تأكيد كلمة المرور")
+        Button({ submit(redId, code, password) }, Modifier.fillMaxWidth(), enabled = redId.isNotBlank() && code.isNotBlank() && password.length >= 10 && password == confirm) { Text("تغيير وإلغاء الجلسات") }
         OutlinedButton(back, Modifier.fillMaxWidth()) { Text("رجوع") }
     }
 }
@@ -110,6 +129,13 @@ private fun PendingScreen(state: AuthState.Pending, check: () -> Unit, login: ()
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(state.redId, color = AqyalGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             IconButton({ clipboard.setText(AnnotatedString(state.redId)) }) { Icon(Icons.Default.ContentCopy, "نسخ") }
+        }
+        if (state.recoveryCodes.isNotEmpty()) {
+            Text("رموز الاستعادة — تظهر مرة واحدة", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            Text(state.recoveryCodes.joinToString("  "), fontSize = 11.sp, textAlign = TextAlign.Center)
+            OutlinedButton({ clipboard.setText(AnnotatedString(state.recoveryCodes.joinToString("\n"))) }, Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.ContentCopy, null); Text(" نسخ الرموز وحفظها خارج الهاتف")
+            }
         }
         Button(check, Modifier.fillMaxWidth()) { Icon(Icons.Default.CheckCircle, null); Text(" التحقق من الموافقة") }
         OutlinedButton(login, Modifier.fillMaxWidth()) { Text("الدخول لاحقاً") }

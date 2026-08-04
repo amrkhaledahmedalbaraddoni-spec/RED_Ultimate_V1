@@ -74,6 +74,7 @@ data class AuthResponse(
     val refreshToken: String? = null,
     val tokenType: String? = null,
     val expiresInSeconds: Long? = null,
+    val recoveryCodes: List<String>? = null,
     val message: String? = null
 )
 

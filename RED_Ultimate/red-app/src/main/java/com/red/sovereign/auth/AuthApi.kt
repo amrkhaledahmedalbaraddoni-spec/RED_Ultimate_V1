@@ -27,6 +27,20 @@ class AuthApi(
     suspend fun refresh(token: String): ApiResult<RefreshResponse> =
         post("/api/auth/refresh", json.encodeToString(RefreshRequest(token))) { json.decodeFromString<RefreshResponse>(it) }
 
+    suspend fun recover(request: PasswordRecoveryRequest): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val http = Request.Builder().url(BuildConfig.RED_SERVER_URL.trimEnd('/') + "/api/auth/recover")
+                .post(json.encodeToString(request).toRequestBody(JSON)).header("Accept", "application/json").build()
+            client.newCall(http).execute().use { response ->
+                if (response.isSuccessful) ApiResult.Success(response.code, Unit)
+                else {
+                    val body = response.body.string()
+                    ApiResult.Error(response.code, runCatching { json.decodeFromString<ErrorResponse>(body).error }.getOrNull() ?: "RECOVERY_FAILED")
+                }
+            }
+        }.getOrElse { ApiResult.Error(null, it.message ?: "NETWORK_ERROR") }
+    }
+
     private suspend fun <T> post(path: String, body: String, decode: (String) -> T): ApiResult<T> = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder()

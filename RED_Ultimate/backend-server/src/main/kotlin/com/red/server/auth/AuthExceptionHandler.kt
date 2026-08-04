@@ -7,9 +7,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class AuthExceptionHandler {
+    @ExceptionHandler(RateLimitExceededException::class)
+    fun rateLimited(): ResponseEntity<Map<String, String>> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(mapOf("error" to "RATE_LIMITED"))
+
     @ExceptionHandler(InvalidCredentialsException::class)
     fun invalidCredentials(): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "INVALID_CREDENTIALS"))
+
+    @ExceptionHandler(InvalidRecoveryCodeException::class)
+    fun invalidRecovery(): ResponseEntity<Map<String, String>> =
+        ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "INVALID_RECOVERY_CODE"))
 
     @ExceptionHandler(InvalidRefreshTokenException::class)
     fun invalidRefresh(): ResponseEntity<Map<String, String>> =

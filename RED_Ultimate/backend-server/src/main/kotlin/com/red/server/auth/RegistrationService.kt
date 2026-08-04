@@ -20,6 +20,7 @@ class RegistrationService(
     private val passwordEncoder: PasswordEncoder,
     private val redIdGenerator: RedIdGenerator,
     private val enrollment: DeviceEnrollmentService,
+    private val recovery: RecoveryService,
     private val refreshTokens: RefreshTokenService,
     private val jwtService: JwtService
 ) {
@@ -50,10 +51,12 @@ class RegistrationService(
             throw IllegalArgumentException("Username is already registered")
         }
         val device = enrollment.enroll(user, request.device)
+        val recoveryCodes = recovery.createFor(user)
         return AuthResponse(
             status = user.status,
             user = user.toResponse(listOf(device)),
             deviceId = device.id,
+            recoveryCodes = recoveryCodes,
             message = "ACCOUNT_PENDING_ADMIN_APPROVAL"
         )
     }

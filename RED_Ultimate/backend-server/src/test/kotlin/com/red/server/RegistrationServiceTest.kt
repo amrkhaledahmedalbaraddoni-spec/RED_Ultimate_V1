@@ -28,9 +28,10 @@ class RegistrationServiceTest {
     private val encoder = mock(PasswordEncoder::class.java)
     private val redIds = mock(RedIdGenerator::class.java)
     private val enrollment = mock(DeviceEnrollmentService::class.java)
+    private val recovery = mock(RecoveryService::class.java)
     private val refresh = mock(RefreshTokenService::class.java)
     private val jwt = mock(JwtService::class.java)
-    private val service = RegistrationService(users, devices, encoder, redIds, enrollment, refresh, jwt)
+    private val service = RegistrationService(users, devices, encoder, redIds, enrollment, recovery, refresh, jwt)
 
     @Test
     fun `new account and its first device remain pending and receive no token`() {
@@ -40,6 +41,7 @@ class RegistrationServiceTest {
         `when`(users.saveAndFlush(any(UserAccount::class.java))).thenAnswer { it.arguments[0] }
         `when`(enrollment.enroll(any(UserAccount::class.java), any(DeviceEnrollmentRequest::class.java)))
             .thenAnswer { UserDevice(user = it.arguments[0] as UserAccount, identityFingerprint = "abc") }
+        `when`(recovery.createFor(any(UserAccount::class.java))).thenReturn(listOf("ABCD-EFGH-JKLM"))
 
         val result = service.register(
             RegisterRequest("Ahmed.Red", "a-strong-password", "أحمد", deviceRequest())
@@ -50,6 +52,7 @@ class RegistrationServiceTest {
         assertEquals("ahmed.red", result.user.username)
         assertNull(result.accessToken)
         assertNull(result.refreshToken)
+        assertEquals(listOf("ABCD-EFGH-JKLM"), result.recoveryCodes)
         assertEquals("ACCOUNT_PENDING_ADMIN_APPROVAL", result.message)
     }
 

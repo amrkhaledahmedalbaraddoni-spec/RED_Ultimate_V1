@@ -36,7 +36,7 @@ The generated Ed25519 private key is mounted read-only into the backend and is i
 }
 ```
 
-HTTP `201` returns a generated ID such as `RED-7K4M-82QX`, the device ID, and `PENDING`. No access or refresh token is issued.
+HTTP `201` returns a generated ID such as `RED-7K4M-82QX`, the device ID, `PENDING`, and ten one-time recovery codes. No access or refresh token is issued. Recovery codes are shown once; the server stores only Argon2id hashes.
 
 ## 2. Login while pending
 
@@ -93,6 +93,20 @@ Revoke the current refresh token with `POST /api/auth/logout`:
 ```json
 { "refreshToken": "..." }
 ```
+
+## Password recovery without phone or email
+
+`POST /api/auth/recover`
+
+```json
+{
+  "redId": "RED-7K4M-82QX",
+  "recoveryCode": "ABCD-EFGH-JKLM",
+  "newPassword": "a-new-long-password"
+}
+```
+
+A successful use consumes that code, changes the Argon2id password hash and revokes every refresh session. Registration, login and recovery endpoints are rate-limited in Redis.
 
 ## Identity directory and device controls
 

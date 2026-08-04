@@ -27,6 +27,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun showRegister() { state = AuthState.Register }
     fun showLogin() { state = AuthState.Login }
+    fun showRecovery() { state = AuthState.Recovery }
     fun showWelcome() { state = AuthState.Welcome }
 
     fun register(displayName: String, username: String, password: String) = viewModelScope.launch {
@@ -37,7 +38,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             is ApiResult.Success -> {
                 result.value.deviceId?.let(tokens::rememberDevice)
                 pendingCredentials = username.trim() to password
-                state = AuthState.Pending(result.value.user.redId, result.value.user.username)
+                state = AuthState.Pending(result.value.user.redId, result.value.user.username, result.value.recoveryCodes.orEmpty())
             }
             is ApiResult.Error -> state = AuthState.Error(localize(result.message))
         }
@@ -55,6 +56,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val credentials = pendingCredentials
         if (credentials == null) state = AuthState.Login
         else login(credentials.first, credentials.second)
+    }
+
+    fun recover(redId: String, code: String, newPassword: String) = viewModelScope.launch {
+        state = AuthState.Submitting
+        state = when (val result = api.recover(PasswordRecoveryRequest(redId.trim(), code.trim(), newPassword))) {
+            is ApiResult.Success -> AuthState.RecoveryComplete
+            is ApiResult.Error -> AuthState.Error(localize(result.message))
+        }
     }
 
     fun dialPstn(number: String) = viewModelScope.launch {
@@ -94,7 +103,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }
             "PENDING" -> {
                 pendingCredentials = username to password
-                state = AuthState.Pending(response.user.redId, response.user.username)
+                state = AuthState.Pending(response.user.redId, response.user.username, emptyList())
             }
             "REJECTED" -> state = AuthState.Rejected(response.user.rejectionReason)
             "SUSPENDED" -> state = AuthState.Suspended
@@ -106,6 +115,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private fun localize(value: String) = when (value) {
         "INVALID_CREDENTIALS" -> "اسم المستخدم أو كلمة المرور غير صحيحة"
         "NETWORK_ERROR" -> "تعذر الاتصال بخادم RED المحلي"
+        "INVALID_RECOVERY_CODE" -> "RED ID أو رمز الاستعادة غير صحيح"
+        "RATE_LIMITED" -> "محاولات كثيرة؛ انتظر قليلاً ثم أعد المحاولة"
         else -> value
     }
 }
@@ -115,8 +126,10 @@ sealed interface AuthState {
     data object Welcome : AuthState
     data object Register : AuthState
     data object Login : AuthState
+    data object Recovery : AuthState
+    data object RecoveryComplete : AuthState
     data object Submitting : AuthState
-    data class Pending(val redId: String, val username: String) : AuthState
+    data class Pending(val redId: String, val username: String, val recoveryCodes: List<String>) : AuthState
     data class Authenticated(val redId: String, val username: String, val pstnEnabled: Boolean) : AuthState
     data class Rejected(val reason: String?) : AuthState
     data object Suspended : AuthState

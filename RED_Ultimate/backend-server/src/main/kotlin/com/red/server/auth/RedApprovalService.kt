@@ -1,5 +1,6 @@
 package com.red.server.auth
 
+import com.red.server.audit.AuditService
 import com.red.server.auth.model.AccountStatus
 import com.red.server.auth.model.DeviceStatus
 import com.red.server.auth.repository.UserAccountRepository
@@ -15,7 +16,8 @@ class RedApprovalService(
     private val users: UserAccountRepository,
     private val devices: UserDeviceRepository,
     private val certificates: DeviceCertificateService,
-    private val refreshTokens: RefreshTokenService
+    private val refreshTokens: RefreshTokenService,
+    private val audit: AuditService
 ) {
     @Transactional(readOnly = true)
     fun getPendingList(): List<UserAccountResponse> =
@@ -65,6 +67,7 @@ class RedApprovalService(
         }
 
         users.save(user)
+        audit.record(adminId, "ACCOUNT_${action.name}", user.id.toString(), mapOf("redId" to user.redId, "reason" to reason))
         return user.toResponse(accountDevices)
     }
 

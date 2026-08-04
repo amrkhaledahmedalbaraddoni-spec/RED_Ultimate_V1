@@ -1,5 +1,6 @@
 package com.red.server
 
+import com.red.server.audit.AuditService
 import com.red.server.auth.RedApprovalService
 import com.red.server.auth.RefreshTokenService
 import com.red.server.auth.model.AccountStatus
@@ -25,7 +26,8 @@ class RedApprovalServiceTest {
     private val devices = mock(UserDeviceRepository::class.java)
     private val certificates = mock(DeviceCertificateService::class.java)
     private val refresh = mock(RefreshTokenService::class.java)
-    private val service = RedApprovalService(users, devices, certificates, refresh)
+    private val audit = mock(AuditService::class.java)
+    private val service = RedApprovalService(users, devices, certificates, refresh, audit)
 
     @Test
     fun `admin approval signs and approves every pending device`() {

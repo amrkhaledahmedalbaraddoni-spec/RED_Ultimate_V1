@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, Button, Modal, Input, Alert, Tag, Space, Table, message } from 'antd';
 import { SafetyOutlined, WarningOutlined, DeleteOutlined, LockOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
@@ -8,24 +8,23 @@ const SecurityTab: React.FC = () => {
     const [wipeModal, setWipeModal] = useState(false);
     const [targetUserId, setTargetUserId] = useState('');
     const [reason, setReason] = useState('');
+    const [securityEvents, setSecurityEvents] = useState<any[]>([]);
+    const loadAudit = async () => { const response = await apiFetch('/api/admin/audit'); if (response.ok) setSecurityEvents(await response.json()); };
+    useEffect(() => { loadAudit(); }, []);
 
-    const handleKillSwitch = () => {
+    const handleKillSwitch = async () => {
         if (!reason) { message.error('Reason required'); return; }
-        apiFetch(`/api/admin/security/kill-switch?reason=${encodeURIComponent(reason)}`, {
-            method: 'POST'
-        })
-        .then(() => { message.success('Kill switch activated!'); setKillSwitchModal(false); })
-        .catch(() => message.error('Failed'));
+        const response = await apiFetch(`/api/admin/security/kill-switch?reason=${encodeURIComponent(reason)}`, { method: 'POST' });
+        if (!response.ok) return message.error('Kill switch failed');
+        message.success('Kill switch activated'); setKillSwitchModal(false); await loadAudit();
     };
 
-    const handleWipe = () => {
+    const handleWipe = async () => {
         if (!targetUserId) { message.error('User ID required'); return; }
-        apiFetch(`/api/admin/security/wipe?userId=${encodeURIComponent(targetUserId)}`, { method: 'POST' })
-            .then(() => { message.success('Wipe signal sent!'); setWipeModal(false); })
-            .catch(() => message.error('Failed'));
+        const response = await apiFetch(`/api/admin/security/wipe?userId=${encodeURIComponent(targetUserId)}`, { method: 'POST' });
+        if (!response.ok) return message.error('Wipe failed');
+        message.success('Wipe signal sent'); setWipeModal(false); await loadAudit();
     };
-
-    const securityEvents: any[] = []; // Populated only when the audit-log API is connected.
 
     return (
         <div>
@@ -83,14 +82,15 @@ const SecurityTab: React.FC = () => {
                     <Card title="Recent Security Events">
                         <Table
                             dataSource={securityEvents}
+                            rowKey="id"
                             columns={[
-                                { title: 'Event', dataIndex: 'event', key: 'event' },
-                                { title: 'User', dataIndex: 'user', key: 'user' },
-                                { title: 'Severity', dataIndex: 'severity', key: 'severity',
-                                  render: (s: string) => <Tag color={s === 'warning' ? 'orange' : 'blue'}>{s}</Tag> },
-                                { title: 'Time', dataIndex: 'time', key: 'time' },
+                                { title: 'Action', dataIndex: 'action', render: (v: string) => <Tag color={v.includes('KILL') ? 'red' : 'blue'}>{v}</Tag> },
+                                { title: 'Target', dataIndex: 'targetId', render: (v: string) => v || '—' },
+                                { title: 'Administrator', dataIndex: 'actorId', render: (v: string) => v || 'SYSTEM' },
+                                { title: 'Time', dataIndex: 'createdAt', render: (v: string) => new Date(v).toLocaleString('ar') },
                             ]}
-                            pagination={false}
+                            locale={{emptyText:'لا توجد أحداث تدقيق مسجلة'}}
+                            pagination={{pageSize:8}}
                             size="small"
                         />
                     </Card>

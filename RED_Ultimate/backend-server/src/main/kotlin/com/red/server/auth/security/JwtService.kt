@@ -19,21 +19,23 @@ class JwtService(
     @Value("\${red.security.jwt-expiration-ms:3600000}") private val expirationMs: Long
 ) {
     private val key: SecretKey by lazy {
-        require(configuredSecret != "change-me-in-production-please") {
-            "JWT_SECRET must be configured; the insecure development value is not allowed"
+        require(configuredSecret.length >= 32 && configuredSecret != "change-me-in-production-please") {
+            "JWT_SECRET must contain at least 32 random characters"
         }
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(configuredSecret.toByteArray(StandardCharsets.UTF_8))
         Keys.hmacShaKeyFor(digest)
     }
 
-    fun issue(user: UserAccount): String {
+    fun issue(user: UserAccount, deviceId: UUID? = null): String {
         val now = Instant.now()
-        return Jwts.builder()
+        val builder = Jwts.builder()
             .subject(user.id.toString())
             .claim("redId", user.redId)
             .claim("username", user.username)
             .claim("role", user.role.name)
+        if (deviceId != null) builder.claim("deviceId", deviceId.toString())
+        return builder
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plusMillis(expirationMs)))
             .signWith(key)
@@ -47,6 +49,8 @@ class JwtService(
         .payload
 
     fun userId(token: String): UUID = UUID.fromString(parse(token).subject)
+
+    fun deviceId(token: String): UUID? = parse(token)["deviceId"]?.toString()?.let(UUID::fromString)
 
     fun expirationSeconds(): Long = expirationMs / 1000
 }

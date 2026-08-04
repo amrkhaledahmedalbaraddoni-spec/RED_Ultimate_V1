@@ -1,19 +1,21 @@
-# RED username registration and administrator approval
+# RED registration, device identity and administrator approval
 
-RED accounts never require a phone number, SIM card, OTP, or SMS.
+RED accounts never require a phone number, SIM card, OTP, or SMS. Private identity keys are generated and retained by the client; the API accepts public key material only.
 
-## Required local environment
+## Local identity authority
 
-Set the following before startup (see the repository `.env.example`):
+Before first startup:
 
-- `JWT_SECRET`: at least 32 random characters.
-- `RED_ADMIN_USERNAME`: initial administrator username.
-- `RED_ADMIN_PASSWORD`: at least 14 characters.
-- Database, Redis, MongoDB, Asterisk and DINSTAR secrets.
+```bash
+cd RED_Ultimate
+./scripts/generate-local-identity-authority.sh
+cp .env.example .env
+# Replace every placeholder in .env
+```
 
-The initial administrator is created only when the configured username does not already exist.
+The generated Ed25519 private key is mounted read-only into the backend and is ignored by Git. Back it up securely. In production it should move to an HSM/PKCS#11 provider.
 
-## 1. Register
+## 1. Register an account and its first device
 
 `POST /api/auth/register`
 
@@ -21,11 +23,20 @@ The initial administrator is created only when the configured username does not 
 {
   "username": "ahmed.red",
   "password": "a-long-private-password",
-  "displayName": "أحمد"
+  "displayName": "أحمد",
+  "device": {
+    "deviceName": "Ahmed Pixel",
+    "platform": "ANDROID",
+    "identityKey": "BASE64_PUBLIC_IDENTITY_KEY",
+    "signedPreKey": "BASE64_SERIALIZED_SIGNED_PRE_KEY",
+    "kyberPreKey": "BASE64_SERIALIZED_KYBER_PRE_KEY",
+    "signedPreKeySignature": "BASE64_SIGNATURE",
+    "kyberPreKeySignature": "BASE64_SIGNATURE"
+  }
 }
 ```
 
-The response is HTTP `201` with a generated ID such as `RED-7K4M-82QX` and status `PENDING`. No access token is issued.
+HTTP `201` returns a generated ID such as `RED-7K4M-82QX`, the device ID, and `PENDING`. No access or refresh token is issued.
 
 ## 2. Login while pending
 
@@ -34,19 +45,19 @@ The response is HTTP `201` with a generated ID such as `RED-7K4M-82QX` and statu
 ```json
 {
   "username": "ahmed.red",
-  "password": "a-long-private-password"
+  "password": "a-long-private-password",
+  "deviceId": "DEVICE-UUID-FROM-REGISTRATION"
 }
 ```
 
-A pending account receives HTTP `423` and `ACCOUNT_PENDING_ADMIN_APPROVAL`. Rejected, suspended and banned accounts receive HTTP `403`.
+A pending account receives HTTP `423`. Rejected, suspended and banned accounts receive HTTP `403`.
 
 ## 3. Administrator approval
 
-First log in with the bootstrap administrator. Use its Bearer token for these requests.
+Log in with the bootstrap administrator and use its Bearer token.
 
-`GET /api/admin/users/pending`
-
-`POST /api/admin/users/action`
+- `GET /api/admin/users/pending`
+- `POST /api/admin/users/action`
 
 ```json
 {
@@ -56,18 +67,46 @@ First log in with the bootstrap administrator. Use its Bearer token for these re
 }
 ```
 
-Supported actions: `APPROVED`, `REJECTED`, `SUSPENDED`, `BANNED`. The approving administrator and approval timestamp are stored.
+Approval atomically:
 
-## 4. Login after approval
+1. approves the account;
+2. signs every pending device fingerprint with the RED Ed25519 identity authority;
+3. stores approval administrator and timestamp;
+4. publishes approved public pre-key bundles.
 
-The same login request now returns HTTP `200`, a short-lived Bearer access token, and the account's RED ID.
+Supported actions: `APPROVED`, `REJECTED`, `SUSPENDED`, `BANNED`.
 
-Use `Authorization: Bearer <token>` with protected HTTP APIs and WebSocket upgrade requests. Only approved accounts can complete a RED WebSocket handshake.
+## 4. Login and token rotation
 
-## Messaging endpoints
+After approval, login returns a short-lived access JWT and a single-use refresh token. User accounts must provide an approved `deviceId`; the bootstrap browser administrator may log in without one.
 
-- `/ws/master`: the only chat protocol; binary `RedProtos.RedRED` envelopes.
+Rotate tokens with `POST /api/auth/refresh`:
+
+```json
+{ "refreshToken": "..." }
+```
+
+Every refresh rotates the token. Reusing an already rotated token revokes all active refresh sessions for the account.
+
+Revoke the current refresh token with `POST /api/auth/logout`:
+
+```json
+{ "refreshToken": "..." }
+```
+
+## Identity directory and device controls
+
+- `GET /api/identity/authority`: public Ed25519 authority key.
+- `GET /api/identity/directory/{redId}`: approved public identity/pre-key bundles and device certificates; authentication required.
+- `GET /api/devices`: current account devices.
+- `DELETE /api/devices/{deviceId}`: revoke a device and all of its refresh sessions.
+
+The authority certificate proves that RED administration approved the binding. Clients must still implement safety numbers, key-change warnings and eventually key transparency.
+
+## WebSocket endpoints
+
+- `/ws/master`: the only binary chat protocol, using `RedProtos.RedRED`.
 - `/ws/calls`: JSON WebRTC signaling only.
-- `/ws/admin/logs`: administrator monitoring stream.
+- `/ws/admin/logs`: administrator-only monitoring stream.
 
-The removed `/ws/chat` and `/ws/red` endpoints used an incompatible legacy ACK protocol and must not be used by new clients.
+All WebSocket upgrades require an approved account and approved device access token in `Authorization: Bearer <token>`, except the bootstrap administrator, whose dashboard token has no device claim.

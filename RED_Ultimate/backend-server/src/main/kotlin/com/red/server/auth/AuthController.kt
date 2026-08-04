@@ -26,4 +26,13 @@ class AuthController(private val registration: RegistrationService) {
         }
         return ResponseEntity.status(status).body(response)
     }
+
+    @PostMapping("/refresh")
+    fun refresh(@RequestBody request: RefreshRequest): RefreshResponse = registration.refresh(request)
+
+    @PostMapping("/logout")
+    fun logout(@RequestBody request: LogoutRequest): ResponseEntity<Void> {
+        registration.logout(request)
+        return ResponseEntity.noContent().build()
+    }
 }

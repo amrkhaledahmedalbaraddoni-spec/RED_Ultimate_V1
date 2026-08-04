@@ -46,7 +46,7 @@ include(":feature:registration")
 // Lint & build tools
 include(":lintchecks")
 include(":fast-lint")
-include(":build-logic:tools")
+includeBuild("build-logic")
 
 // Benchmark modules
 include(":benchmark")

@@ -1,11 +1,16 @@
 package com.red.server
 
+import com.red.server.auth.DeviceEnrollmentRequest
+import com.red.server.auth.DeviceEnrollmentService
 import com.red.server.auth.RedIdGenerator
+import com.red.server.auth.RefreshTokenService
 import com.red.server.auth.RegisterRequest
 import com.red.server.auth.RegistrationService
 import com.red.server.auth.model.AccountStatus
 import com.red.server.auth.model.UserAccount
+import com.red.server.auth.model.UserDevice
 import com.red.server.auth.repository.UserAccountRepository
+import com.red.server.auth.repository.UserDeviceRepository
 import com.red.server.auth.security.JwtService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -15,36 +20,49 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.springframework.security.crypto.password.PasswordEncoder
+import java.util.Base64
 
 class RegistrationServiceTest {
     private val users = mock(UserAccountRepository::class.java)
+    private val devices = mock(UserDeviceRepository::class.java)
     private val encoder = mock(PasswordEncoder::class.java)
     private val redIds = mock(RedIdGenerator::class.java)
+    private val enrollment = mock(DeviceEnrollmentService::class.java)
+    private val refresh = mock(RefreshTokenService::class.java)
     private val jwt = mock(JwtService::class.java)
-    private val service = RegistrationService(users, encoder, redIds, jwt)
+    private val service = RegistrationService(users, devices, encoder, redIds, enrollment, refresh, jwt)
 
     @Test
-    fun `new account is pending and receives no token`() {
+    fun `new account and its first device remain pending and receive no token`() {
         `when`(users.existsByUsernameIgnoreCase("ahmed.red")).thenReturn(false)
         `when`(redIds.next()).thenReturn("RED-7K4M-82QX")
         `when`(encoder.encode("a-strong-password")).thenReturn("argon2-hash")
         `when`(users.saveAndFlush(any(UserAccount::class.java))).thenAnswer { it.arguments[0] }
+        `when`(enrollment.enroll(any(UserAccount::class.java), any(DeviceEnrollmentRequest::class.java)))
+            .thenAnswer { UserDevice(user = it.arguments[0] as UserAccount, identityFingerprint = "abc") }
 
         val result = service.register(
-            RegisterRequest("Ahmed.Red", "a-strong-password", "أحمد")
+            RegisterRequest("Ahmed.Red", "a-strong-password", "أحمد", deviceRequest())
         )
 
         assertEquals(AccountStatus.PENDING, result.status)
         assertEquals("RED-7K4M-82QX", result.user.redId)
         assertEquals("ahmed.red", result.user.username)
         assertNull(result.accessToken)
+        assertNull(result.refreshToken)
         assertEquals("ACCOUNT_PENDING_ADMIN_APPROVAL", result.message)
     }
 
     @Test
     fun `phone-like or malformed username is rejected`() {
         assertThrows(IllegalArgumentException::class.java) {
-            service.register(RegisterRequest("777123456", "a-strong-password", "أحمد"))
+            service.register(RegisterRequest("777123456", "a-strong-password", "أحمد", deviceRequest()))
         }
+    }
+
+    private fun deviceRequest(): DeviceEnrollmentRequest {
+        val key = Base64.getEncoder().encodeToString(ByteArray(64) { 1 })
+        return DeviceEnrollmentRequest("Pixel", identityKey = key, signedPreKey = key, kyberPreKey = key,
+            signedPreKeySignature = key, kyberPreKeySignature = key)
     }
 }

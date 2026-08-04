@@ -46,6 +46,12 @@ red:
     jwt-secret: ${JWT_SECRET:}
     jwt-expiration-ms: ${JWT_EXPIRATION_MS:3600000}
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost,http://127.0.0.1}
+    refresh-expiration-days: ${REFRESH_EXPIRATION_DAYS:30}
+
+  identity-authority:
+    private-key-path: ${RED_IDENTITY_PRIVATE_KEY_PATH:}
+    public-key-path: ${RED_IDENTITY_PUBLIC_KEY_PATH:}
+    certificate-valid-days: ${RED_DEVICE_CERTIFICATE_VALID_DAYS:90}
 
   bootstrap-admin:
     username: ${RED_ADMIN_USERNAME:}

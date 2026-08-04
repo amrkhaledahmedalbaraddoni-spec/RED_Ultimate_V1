@@ -1,0 +1,22 @@
+package com.red.sovereign.auth
+
+import android.content.Context
+import com.red.sovereign.core.SecureStore
+
+class TokenStore(context: Context) {
+    private val store = SecureStore(context, "red_session")
+    val accessToken get() = store.get("access")
+    val refreshToken get() = store.get("refresh")
+    val deviceId get() = store.get("device_id")
+    val redId get() = store.get("red_id")
+    val username get() = store.get("username")
+
+    fun rememberDevice(value: String) = store.put("device_id", value)
+    fun save(response: AuthResponse) {
+        store.put("access", response.accessToken); store.put("refresh", response.refreshToken)
+        response.deviceId?.let(::rememberDevice)
+        store.put("red_id", response.user.redId); store.put("username", response.user.username)
+    }
+    fun updateTokens(response: RefreshResponse) { store.put("access", response.accessToken); store.put("refresh", response.refreshToken) }
+    fun clearSession() = store.remove("access", "refresh", "red_id", "username")
+}

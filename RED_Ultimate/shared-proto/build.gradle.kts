@@ -9,7 +9,7 @@ java {
 }
 
 dependencies {
-    implementation("com.google.protobuf:protobuf-java:3.25.1")
+    api("com.google.protobuf:protobuf-java:3.25.1")
 }
 
 sourceSets {

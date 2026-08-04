@@ -6,6 +6,7 @@ import {
   CloudServerOutlined, 
   ApiFilled 
 } from '@ant-design/icons';
+import { apiFetch } from '../api';
 
 const MasterOverview: React.FC = () => {
     const [stats, setStats] = useState<any>({
@@ -18,7 +19,7 @@ const MasterOverview: React.FC = () => {
     useEffect(() => {
         // Fetch real aggregated data from /api/master/admin/stats
         const interval = setInterval(async () => {
-            const resp = await fetch('/api/master/v1/stats/realtime');
+            const resp = await apiFetch('/api/master/v1/stats/realtime');
             if (resp.ok) setStats(await resp.json());
         }, 3000);
         return () => clearInterval(interval);

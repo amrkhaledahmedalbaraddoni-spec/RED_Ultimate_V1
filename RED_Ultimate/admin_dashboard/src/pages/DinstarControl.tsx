@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Progress, Switch, Button, Modal, Input, message, Table, Tag } from 'antd';
-import { SettingOutlined, PoweroffOutlined, REDFilled, HistoryOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Progress, Switch, Button, Modal, Input, message, Table, Tag, Space } from 'antd';
+import { SettingOutlined, PoweroffOutlined, SignalFilled, HistoryOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../api';
 const DinstarControl: React.FC = () => {
     const [ports, setPorts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     const fetchStatus = async () => {
-        const resp = await fetch('/api/admin/dinstar/status');
+        const resp = await apiFetch('/api/admin/dinstar/status');
         if (resp.ok) setPorts(await resp.json());
     };
 
@@ -20,7 +21,7 @@ const DinstarControl: React.FC = () => {
             okText: 'Reboot Now',
             okType: 'danger',
             onOk: async () => {
-                await fetch('/api/admin/dinstar/reboot', { method: 'POST' });
+                await apiFetch('/api/admin/dinstar/reboot', { method: 'POST' });
                 message.warning('DINSTAR: Reboot command sent.');
             }
         });
@@ -45,10 +46,10 @@ const DinstarControl: React.FC = () => {
                             style={{ border: port.status === 'READY' ? '1px solid #52c41a' : '1px solid #f5222d' }}
                         >
                             <div style={{ textAlign: 'center' }}>
-                                <REDFilled style={{ fontSize: 40, color: port.signal > 50 ? '#52c41a' : '#fadb14' }} />
+                                <SignalFilled style={{ fontSize: 40, color: port.signal > 50 ? '#52c41a' : '#fadb14' }} />
                                 <div style={{ marginTop: 8 }}>
                                     <Tag color="blue">{port.operator}</Tag>
-                                    <Tag color="cyan">{port.signal}% RED</Tag>
+                                    <Tag color="cyan">{port.signal}% Signal</Tag>
                                 </div>
                             </div>
                             <div style={{ marginTop: 16 }}>

@@ -15,6 +15,8 @@ import AuthorityTab from './tabs/AuthorityTab';
 import DinstarTab from './tabs/DinstarTab';
 import MessagingTab from './tabs/MessagingTab';
 import SecurityTab from './tabs/SecurityTab';
+import MediaTab from './tabs/MediaTab';
+import InfrastructureTab from './tabs/InfrastructureTab';
 
 const { Header, Content, Sider } = Layout;
 
@@ -43,17 +45,19 @@ const MasterLayout: React.FC = () => {
       <Layout>
         <Header style={{ background: '#0a0a0a', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Space>
-             <Tag color="error">CORE SERVER: ONLINE</Tag>
-             <Tag color="warning">GSM GATEWAY: CONNECTED</Tag>
+             <Tag color="blue">LOCAL MODE</Tag>
+             <Tag color="gold">RED ID AUTHORITY</Tag>
           </Space>
-          <Badge count={5} offset={[10, 0]}><AlertOutlined style={{ color: '#fff', fontSize: 20 }} /></Badge>
+          <Badge dot={false}><AlertOutlined style={{ color: '#fff', fontSize: 20 }} /></Badge>
         </Header>
         <Content style={{ margin: '24px 16px', padding: 24, background: '#141414', borderRadius: borderRadiusLG, overflow: 'initial' }}>
           {currentTab === '1' && <OverviewTab />}
           {currentTab === '2' && <AuthorityTab />}
           {currentTab === '3' && <MessagingTab />}
           {currentTab === '4' && <DinstarTab />}
+          {currentTab === '5' && <MediaTab />}
           {currentTab === '6' && <SecurityTab />}
+          {currentTab === '7' && <InfrastructureTab />}
         </Content>
       </Layout>
     </Layout>

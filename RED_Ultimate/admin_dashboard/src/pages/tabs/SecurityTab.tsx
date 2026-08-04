@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Row, Col, Statistic, Button, Modal, Input, Alert, Tag, Space, Table, message } from 'antd';
 import { SafetyOutlined, WarningOutlined, DeleteOutlined, LockOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../../api';
 const SecurityTab: React.FC = () => {
     const [killSwitchModal, setKillSwitchModal] = useState(false);
     const [wipeModal, setWipeModal] = useState(false);
@@ -10,10 +11,8 @@ const SecurityTab: React.FC = () => {
 
     const handleKillSwitch = () => {
         if (!reason) { message.error('Reason required'); return; }
-        fetch('/api/master/v1/security/kill-switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reason })
+        apiFetch(`/api/admin/security/kill-switch?reason=${encodeURIComponent(reason)}`, {
+            method: 'POST'
         })
         .then(() => { message.success('Kill switch activated!'); setKillSwitchModal(false); })
         .catch(() => message.error('Failed'));
@@ -21,7 +20,7 @@ const SecurityTab: React.FC = () => {
 
     const handleWipe = () => {
         if (!targetUserId) { message.error('User ID required'); return; }
-        fetch(`/api/master/v1/security/wipe/${targetUserId}`, { method: 'POST' })
+        apiFetch(`/api/admin/security/wipe?userId=${encodeURIComponent(targetUserId)}`, { method: 'POST' })
             .then(() => { message.success('Wipe signal sent!'); setWipeModal(false); })
             .catch(() => message.error('Failed'));
     };

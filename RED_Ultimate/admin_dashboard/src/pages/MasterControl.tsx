@@ -7,6 +7,7 @@ import {
   ControlOutlined,
   ThunderboltFilled
 } from '@ant-design/icons';
+import { apiFetch } from '../api';
 import ReactECharts from 'echarts-for-react';
 
 const MasterControl: React.FC = () => {
@@ -15,7 +16,7 @@ const MasterControl: React.FC = () => {
 
     useEffect(() => {
         const interval = setInterval(async () => {
-            const resp = await fetch('/api/master/admin/hardware/dinstar/slots');
+            const resp = await apiFetch('/api/master/admin/hardware/dinstar/slots');
             if (resp.ok) setDinstarData(await resp.json());
             
             // Fetch system load

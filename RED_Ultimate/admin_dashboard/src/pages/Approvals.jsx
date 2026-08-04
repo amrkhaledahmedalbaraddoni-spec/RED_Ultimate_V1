@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Tag, Space, message } from 'antd';
 
+import { apiFetch } from '../api';
 const Approvals = () => {
     const [pendingUsers, setPendingUsers] = useState([]);
 
     useEffect(() => {
         // جلب المستخدمين الذين ينتظرون الموافقة
-        fetch('/api/admin/pending-users')
+        apiFetch('/api/admin/pending-users')
             .then(res => res.json())
             .then(data => setPendingUsers(data));
     }, []);
 
     const handleAction = (userId, status) => {
-        fetch(`/api/admin/approve/${userId}?status=${status}`, { method: 'POST' })
+        apiFetch(`/api/admin/approve/${userId}?status=${status}`, { method: 'POST' })
             .then(() => {
                 message.success(`User ${status} successfully`);
                 setPendingUsers(pendingUsers.filter(u => u.id !== userId));

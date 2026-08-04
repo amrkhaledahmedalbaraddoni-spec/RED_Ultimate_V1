@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Tag, Space, message, Input, Modal, Avatar } from 'antd';
 import { CheckCircleOutlined, StopOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../api';
 const UserApproval: React.FC = () => {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -9,7 +10,7 @@ const UserApproval: React.FC = () => {
     const fetchPending = async () => {
         setLoading(true);
         try {
-            const resp = await fetch('/api/admin/users/pending');
+            const resp = await apiFetch('/api/admin/users/pending');
             const data = await resp.json();
             setUsers(data);
         } catch (e) { message.error("RED: Connection to Master Server failed."); }
@@ -23,7 +24,7 @@ const UserApproval: React.FC = () => {
             title: `Confirm ${action}`,
             content: `Are you sure you want to ${action} this user?`,
             onOk: async () => {
-                await fetch(`/api/admin/users/update-status?userId=${userId}&status=${action}`, { method: 'POST' });
+                await apiFetch(`/api/admin/users/update-status?userId=${userId}&status=${action}`, { method: 'POST' });
                 message.success(`User ${action} successfully.`);
                 fetchPending();
             }

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Layout, Menu } from 'antd';
+import { Button, Layout, Menu } from 'antd';
+import { authStore } from './api';
+import Login from './pages/Login';
 import {
     DashboardOutlined,
     TeamOutlined,
@@ -10,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import Dashboard from './pages/Dashboard';
 import MasterOverview from './pages/MasterOverview';
-import UserApproval from './pages/UserApproval';
+import AuthorityTab from './pages/tabs/AuthorityTab';
 import MasterLayout from './pages/MasterLayout';
 import DinstarControl from './pages/DinstarControl';
 import Diagnostics from './pages/Diagnostics';
@@ -27,13 +29,18 @@ const menuItems = [
 ];
 
 function App() {
+    const [authenticated, setAuthenticated] = useState(Boolean(authStore.access() || authStore.refresh()));
     const [currentPage, setCurrentPage] = useState('dashboard');
+
+    if (!authenticated) return <Login onSuccess={() => setAuthenticated(true)} />;
+
+    const logout = () => { authStore.clear(); setAuthenticated(false); };
 
     const renderPage = () => {
         switch (currentPage) {
             case 'dashboard': return <Dashboard />;
             case 'master': return <MasterLayout />;
-            case 'users': return <UserApproval />;
+            case 'users': return <AuthorityTab />;
             case 'dinstar': return <DinstarControl />;
             case 'monitor': return <MasterOverview />;
             case 'diagnostics': return <Diagnostics />;
@@ -56,8 +63,9 @@ function App() {
                 />
             </Sider>
             <Layout>
-                <Header style={{ background: '#fff', padding: '0 16px', fontSize: 16, fontWeight: 'bold' }}>
-                    RED Sovereign — Admin Panel
+                <Header style={{ background: '#fff', padding: '0 16px', fontSize: 16, fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>RED Sovereign — Admin Panel</span>
+                    <Button danger onClick={logout}>تسجيل الخروج</Button>
                 </Header>
                 <Content style={{ margin: 16, padding: 24, background: '#f5f5f5' }}>
                     {renderPage()}

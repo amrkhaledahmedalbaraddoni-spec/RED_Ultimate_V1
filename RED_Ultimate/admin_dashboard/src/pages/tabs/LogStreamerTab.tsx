@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card, Tag } from 'antd';
+import { authStore } from '../../api';
 
 const LogStreamerTab: React.FC = () => {
     const [logs, setLogs] = useState<string[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/admin/logs`);
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const token = encodeURIComponent(authStore.access() || '');
+        const ws = new WebSocket(`${scheme}://${window.location.host}/ws/admin/logs?access_token=${token}`);
         ws.onmessage = (event) => {
             setLogs(prev => [...prev.slice(-100), event.data]); // Keep last 100 logs
         };
@@ -26,7 +29,7 @@ const LogStreamerTab: React.FC = () => {
                     overflowY: 'auto', 
                     fontFamily: 'monospace', 
                     background: '#050505', 
-                    padding: '16.dp',
+                    padding: '16px',
                     color: '#00ff00' 
                 }}
             >

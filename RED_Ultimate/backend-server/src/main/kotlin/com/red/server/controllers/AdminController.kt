@@ -53,7 +53,11 @@ class AdminController(
     @GetMapping("/stories/monitor")
     fun monitorStories() = ResponseEntity.ok(coreService.getActiveStoriesCount())
 
-    @PostMapping("/security/kill-switch")
-    fun activateKillSwitch(@RequestParam userId: String) =
+    @PostMapping("/security/wipe")
+    fun wipeUser(@RequestParam userId: String) =
         ResponseEntity.ok(securityService.sendWipeSignal(userId))
+
+    @PostMapping("/security/kill-switch")
+    fun activateKillSwitch(@RequestParam reason: String) =
+        ResponseEntity.ok(securityService.activateKillSwitch(reason))
 }

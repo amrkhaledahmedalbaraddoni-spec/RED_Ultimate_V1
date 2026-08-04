@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, List, Badge, message, Spin } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../api';
 /**
  * RED System Diagnostics
  * CONNECTED TO REAL BACKEND ENDPOINTS.
@@ -20,7 +21,7 @@ const Diagnostics = () => {
         message.loading('RED: Running Full System Diagnostics...', 1);
         
         try {
-            const response = await fetch('/api/master/v1/stats/realtime');
+            const response = await apiFetch('/api/master/v1/stats/realtime');
             const data = await response.json();
             
             setResults([

@@ -24,9 +24,17 @@ class JwtHandshakeInterceptor(
         wsHandler: WebSocketHandler,
         attributes: MutableMap<String, Any>
     ): Boolean {
-        val token = request.headers.getFirst("Authorization")
+        val headerToken = request.headers.getFirst("Authorization")
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substringAfter(' ')
+        // Browser WebSocket APIs cannot set Authorization headers. Query fallback is for the
+        // local admin dashboard and must only be used over WireGuard or TLS.
+        val queryToken = request.uri.rawQuery
+            ?.split('&')
+            ?.firstOrNull { it.startsWith("access_token=") }
+            ?.substringAfter('=')
+            ?.let { java.net.URLDecoder.decode(it, Charsets.UTF_8) }
+        val token = headerToken ?: queryToken
         if (token.isNullOrBlank()) return reject(response)
 
         val result = runCatching {

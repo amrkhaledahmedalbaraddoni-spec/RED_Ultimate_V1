@@ -1,16 +1,12 @@
-# RED Admin Dashboard - Static Server
-FROM node:22-alpine
-
+FROM node:22-alpine AS builder
 WORKDIR /app
-COPY package.json ./
-RUN npm install --production 2>/dev/null || true
-
-# Copy all source files (will be served via simple static server)
+COPY package*.json ./
+RUN npm install --no-audit --no-fund
 COPY . .
+RUN npm run build
 
-# Install a simple static file server
-RUN npm install -g serve 2>/dev/null || true
-
+FROM nginx:1.27-alpine
+COPY dashboard.nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 3000
-
-CMD ["npx", "serve", "-s", "public", "-l", "3000"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:3000/ >/dev/null || exit 1

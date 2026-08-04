@@ -3,6 +3,7 @@ import { Row, Col, Card, Statistic, Spin, Alert } from 'antd';
 import { UserOutlined, MessageOutlined, PhoneOutlined, SafetyOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 
+import { apiFetch } from '../api';
 const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -10,7 +11,7 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const resp = await fetch('/api/admin/monitor/stats');
+                const resp = await apiFetch('/api/admin/monitor/stats');
                 const data = await resp.json();
                 setStats(data);
                 setLoading(false);

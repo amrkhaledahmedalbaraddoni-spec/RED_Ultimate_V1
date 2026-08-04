@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Progress, Row, Col, Statistic, Table, Tag } from 'antd';
-import { ThunderboltFilled, signalFilled } from '@ant-design/icons';
 
+import { apiFetch } from '../api';
 const DuminAdvanced: React.FC = () => {
     const [hwData, setHwData] = useState<any>(null);
 
     useEffect(() => {
         const timer = setInterval(async () => {
-            const resp = await fetch('/api/admin/dumin/telemetry');
+            const resp = await apiFetch('/api/admin/dumin/telemetry');
             if (resp.ok) setHwData(await resp.json());
         }, 5000);
         return () => clearInterval(timer);

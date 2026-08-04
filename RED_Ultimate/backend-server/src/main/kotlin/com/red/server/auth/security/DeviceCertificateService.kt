@@ -34,7 +34,7 @@ class DeviceCertificateService(
             expiresAt.epochSecond.toString()
         ).joinToString("|")
 
-        val signer = Signature.getInstance("Ed25519")
+        val signer = Signature.getInstance("SHA256withECDSA")
         signer.initSign(loadPrivateKey())
         signer.update(payload.toByteArray(StandardCharsets.UTF_8))
         val encoder = Base64.getUrlEncoder().withoutPadding()
@@ -50,7 +50,7 @@ class DeviceCertificateService(
         return Base64.getEncoder().encodeToString(readPemOrDer(Path.of(publicKeyPath)))
     }
 
-    private fun loadPrivateKey() = KeyFactory.getInstance("Ed25519").generatePrivate(
+    private fun loadPrivateKey() = KeyFactory.getInstance("EC").generatePrivate(
         PKCS8EncodedKeySpec(readPemOrDer(Path.of(privateKeyPath)))
     )
 

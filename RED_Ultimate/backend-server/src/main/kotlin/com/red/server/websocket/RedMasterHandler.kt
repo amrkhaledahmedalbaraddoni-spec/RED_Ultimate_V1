@@ -40,14 +40,15 @@ class RedMasterHandler(
         require(incoming.senderId == sender) { "senderId does not match authenticated RED ID" }
         val stored = messages.processIncoming(incoming)
         send(session, ack(stored, "SENT"))
-        sendToUser(stored.receiverId, messageEnvelope(stored))
+        sendToDevice(stored.receiverId, stored.receiverDeviceId, messageEnvelope(stored))
         // Synchronize the sender's other approved devices without echoing to this socket.
         sendToUser(sender, messageEnvelope(stored), exceptSessionId = session.id)
     }
 
     private fun receiveAck(session: WebSocketSession, incoming: RedProtos.MessageAck) {
         val recipient = userId(session)
-        val stored = messages.acknowledge(recipient, incoming.messageId, incoming.status)
+        val deviceId = session.attributes["protocolDeviceId"] as? Int ?: error("Protocol device is missing")
+        val stored = messages.acknowledge(recipient, deviceId, incoming.messageId, incoming.status)
         val ack = ack(stored, stored.status)
         sendToUser(stored.senderId, ack)
         sendToUser(stored.receiverId, ack, exceptSessionId = session.id)
@@ -77,8 +78,10 @@ class RedMasterHandler(
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val redId = userId(session)
         sessions.computeIfAbsent(redId) { ConcurrentHashMap() }[session.id] = session
+        val protocolDeviceId = session.attributes["protocolDeviceId"] as? Int
+            ?: throw IllegalStateException("Messaging requires an approved protocol device")
         redis.opsForZSet().add("red:presence:index", redId, System.currentTimeMillis().toDouble())
-        messages.pendingFor(redId).forEach { send(session, messageEnvelope(it)) }
+        messages.pendingFor(redId, protocolDeviceId).forEach { send(session, messageEnvelope(it)) }
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
@@ -87,6 +90,10 @@ class RedMasterHandler(
             userSessions.remove(session.id)
             if (userSessions.isEmpty()) sessions.remove(redId, userSessions)
         }
+    }
+
+    private fun sendToDevice(redId: String, protocolDeviceId: Int, envelope: RedProtos.RedRED) {
+        sessions[redId]?.values?.filter { it.isOpen && it.attributes["protocolDeviceId"] == protocolDeviceId }?.forEach { send(it, envelope) }
     }
 
     private fun sendToUser(redId: String, envelope: RedProtos.RedRED, exceptSessionId: String? = null) {
@@ -104,7 +111,9 @@ class RedMasterHandler(
             .setId(message.uuid).setConversationId(message.conversationId)
             .setSenderId(message.senderId).setReceiverId(message.receiverId)
             .setPayload(ByteString.copyFrom(message.payload)).setTimestamp(message.createdAt.toEpochMilli())
-            .setSequenceNumber(message.sequenceNumber).setType(message.messageType).build()
+            .setSequenceNumber(message.sequenceNumber).setType(message.messageType)
+            .setSenderDeviceId(message.senderDeviceId).setReceiverDeviceId(message.receiverDeviceId)
+            .setCiphertextType(message.ciphertextType).build()
         return RedProtos.RedRED.newBuilder().setMessage(value).build()
     }
 

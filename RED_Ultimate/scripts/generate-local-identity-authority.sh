@@ -18,7 +18,7 @@ if [ -e "$PRIVATE" ] || [ -e "$PUBLIC" ]; then
   exit 1
 fi
 
-openssl genpkey -algorithm ED25519 -out "$PRIVATE"
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$PRIVATE"
 openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
 chmod 600 "$PRIVATE"
 chmod 644 "$PUBLIC"

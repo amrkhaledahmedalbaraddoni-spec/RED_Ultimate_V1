@@ -32,7 +32,8 @@ class MessageService(
     fun processIncoming(message: RedProtos.ChatMessage): MessageDocument {
         validate(message)
         mongo.findOne(Query(Criteria.where("uuid").`is`(message.id)), MessageDocument::class.java)?.let { existing ->
-            require(existing.senderId == message.senderId && existing.receiverId == message.receiverId && existing.conversationId == message.conversationId) {
+            require(existing.senderId == message.senderId && existing.receiverId == message.receiverId && existing.conversationId == message.conversationId &&
+                existing.senderDeviceId == message.senderDeviceId && existing.receiverDeviceId == message.receiverDeviceId) {
                 "Message UUID collision"
             }
             return existing
@@ -45,6 +46,9 @@ class MessageService(
             receiverId = message.receiverId,
             payload = message.payload.toByteArray(),
             messageType = message.type.ifBlank { "TEXT" },
+            senderDeviceId = message.senderDeviceId,
+            receiverDeviceId = message.receiverDeviceId,
+            ciphertextType = message.ciphertextType,
             sequenceNumber = nextSequence(message.conversationId),
             status = "SENT"
         )
@@ -57,8 +61,8 @@ class MessageService(
         return saved
     }
 
-    fun pendingFor(receiverId: String, limit: Int = 500): List<MessageDocument> = mongo.find(
-        Query(Criteria.where("receiverId").`is`(receiverId).and("status").`is`("SENT").and("deletedAt").`is`(null))
+    fun pendingFor(receiverId: String, receiverDeviceId: Int, limit: Int = 500): List<MessageDocument> = mongo.find(
+        Query(Criteria.where("receiverId").`is`(receiverId).and("receiverDeviceId").`is`(receiverDeviceId).and("status").`is`("SENT").and("deletedAt").`is`(null))
             .with(Sort.by(Sort.Direction.ASC, "createdAt")).limit(limit.coerceIn(1, 500)),
         MessageDocument::class.java
     )
@@ -73,12 +77,12 @@ class MessageService(
     }
 
     /** Only the intended receiver may advance SENT -> DELIVERED -> READ. */
-    fun acknowledge(receiverId: String, messageId: String, requestedStatus: String): MessageDocument {
+    fun acknowledge(receiverId: String, receiverDeviceId: Int, messageId: String, requestedStatus: String): MessageDocument {
         val status = requestedStatus.uppercase()
         require(status == "DELIVERED" || status == "READ") { "Unsupported ACK status" }
         val message = mongo.findOne(Query(Criteria.where("uuid").`is`(messageId)), MessageDocument::class.java)
             ?: throw NoSuchElementException("Message not found")
-        require(message.receiverId == receiverId) { "Only the recipient can acknowledge this message" }
+        require(message.receiverId == receiverId && message.receiverDeviceId == receiverDeviceId) { "Only the target device can acknowledge this message" }
         if (rank(status) > rank(message.status)) {
             message.status = status
             if (status == "DELIVERED" && message.deliveredAt == null) message.deliveredAt = Instant.now()
@@ -107,6 +111,8 @@ class MessageService(
         require(message.senderId.matches(RED_ID)) { "Invalid sender RED ID" }
         require(message.receiverId.matches(RED_ID) && message.receiverId != message.senderId) { "Invalid receiver RED ID" }
         require(message.conversationId.length in 8..128) { "Invalid conversation ID" }
+        require(message.senderDeviceId in 1..127 && message.receiverDeviceId in 1..127) { "Invalid protocol device ID" }
+        require(message.ciphertextType == 2 || message.ciphertextType == 3) { "Unsupported libsignal ciphertext type" }
         require(message.payload.size() in 1..1_048_576) { "Encrypted envelope must contain 1 byte to 1 MiB" }
         require(message.type.ifBlank { "TEXT" } in TYPES) { "Unsupported message type" }
     }

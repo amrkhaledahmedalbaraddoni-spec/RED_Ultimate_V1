@@ -16,6 +16,9 @@ class DeviceEnrollmentService(private val devices: UserDeviceRepository) {
         val kyberPreKey = decode(request.kyberPreKey, "kyberPreKey", 32, 16_384)
         val signedSignature = decode(request.signedPreKeySignature, "signedPreKeySignature", 32, 512)
         val kyberSignature = decode(request.kyberPreKeySignature, "kyberPreKeySignature", 32, 512)
+        require(request.registrationId in 1..16_380) { "Invalid libsignal registration ID" }
+        require(request.protocolDeviceId in 1..127) { "Invalid libsignal device ID" }
+        require(request.signedPreKeyId >= 0 && request.kyberPreKeyId >= 0) { "Invalid pre-key ID" }
         val name = request.deviceName.trim()
         require(name.length in 1..100) { "deviceName must be 1-100 characters" }
         val platform = request.platform.trim().uppercase()
@@ -26,6 +29,10 @@ class DeviceEnrollmentService(private val devices: UserDeviceRepository) {
                 user = user,
                 deviceName = name,
                 platform = platform,
+                registrationId = request.registrationId,
+                protocolDeviceId = request.protocolDeviceId,
+                signedPreKeyId = request.signedPreKeyId,
+                kyberPreKeyId = request.kyberPreKeyId,
                 identityKey = identityKey,
                 signedPreKey = signedPreKey,
                 kyberPreKey = kyberPreKey,

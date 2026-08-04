@@ -65,7 +65,7 @@ class RegistrationServiceTest {
 
     private fun deviceRequest(): DeviceEnrollmentRequest {
         val key = Base64.getEncoder().encodeToString(ByteArray(64) { 1 })
-        return DeviceEnrollmentRequest("Pixel", identityKey = key, signedPreKey = key, kyberPreKey = key,
+        return DeviceEnrollmentRequest("Pixel", registrationId = 42, protocolDeviceId = 1, signedPreKeyId = 7, kyberPreKeyId = 8, identityKey = key, signedPreKey = key, kyberPreKey = key,
             signedPreKeySignature = key, kyberPreKeySignature = key)
     }
 }

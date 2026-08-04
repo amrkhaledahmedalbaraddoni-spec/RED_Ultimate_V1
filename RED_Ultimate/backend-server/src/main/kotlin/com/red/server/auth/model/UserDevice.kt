@@ -28,6 +28,18 @@ class UserDevice(
     @Column(nullable = false, length = 30)
     var platform: String = "ANDROID",
 
+    @Column(name = "registration_id", nullable = false)
+    var registrationId: Int = 0,
+
+    @Column(name = "protocol_device_id", nullable = false)
+    var protocolDeviceId: Int = 0,
+
+    @Column(name = "signed_pre_key_id", nullable = false)
+    var signedPreKeyId: Int = 0,
+
+    @Column(name = "kyber_pre_key_id", nullable = false)
+    var kyberPreKeyId: Int = 0,
+
     @Column(name = "identity_key", nullable = false, columnDefinition = "BYTEA")
     var identityKey: ByteArray = byteArrayOf(),
 

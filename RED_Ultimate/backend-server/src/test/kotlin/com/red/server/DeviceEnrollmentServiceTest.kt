@@ -25,7 +25,7 @@ class DeviceEnrollmentServiceTest {
         val encoded = Base64.getEncoder().encodeToString(bytes)
         val device = service.enroll(
             UserAccount(redId = "RED-TEST-0001", username = "test", displayName = "Test"),
-            DeviceEnrollmentRequest("Pixel", identityKey = encoded, signedPreKey = encoded,
+            DeviceEnrollmentRequest("Pixel", registrationId = 42, protocolDeviceId = 1, signedPreKeyId = 7, kyberPreKeyId = 8, identityKey = encoded, signedPreKey = encoded,
                 kyberPreKey = encoded, signedPreKeySignature = encoded, kyberPreKeySignature = encoded)
         )
         assertEquals(DeviceStatus.PENDING, device.status)
@@ -37,7 +37,7 @@ class DeviceEnrollmentServiceTest {
         assertThrows(IllegalArgumentException::class.java) {
             service.enroll(
                 UserAccount(),
-                DeviceEnrollmentRequest("Pixel", identityKey = "not-base64!", signedPreKey = "x",
+                DeviceEnrollmentRequest("Pixel", registrationId = 42, protocolDeviceId = 1, signedPreKeyId = 7, kyberPreKeyId = 8, identityKey = "not-base64!", signedPreKey = "x",
                     kyberPreKey = "x", signedPreKeySignature = "x", kyberPreKeySignature = "x")
             )
         }

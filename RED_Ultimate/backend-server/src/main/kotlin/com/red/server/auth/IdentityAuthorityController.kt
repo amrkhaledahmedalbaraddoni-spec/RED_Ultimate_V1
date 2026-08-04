@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController
 class IdentityAuthorityController(private val certificates: DeviceCertificateService) {
     @GetMapping("/authority")
     fun authority() = mapOf(
-        "algorithm" to "Ed25519",
+        "algorithm" to "ECDSA_P256_SHA256",
         "version" to "v1",
         "publicKey" to certificates.authorityPublicKey()
     )

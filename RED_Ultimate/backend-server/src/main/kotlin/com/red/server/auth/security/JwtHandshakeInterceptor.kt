@@ -40,18 +40,18 @@ class JwtHandshakeInterceptor(
         val result = runCatching {
             val user = users.findById(jwtService.userId(token)).orElse(null) ?: return@runCatching null
             val deviceId = jwtService.deviceId(token)
-            val deviceAllowed = if (deviceId != null) {
-                devices.findByIdAndUserId(deviceId, user.id)?.status == DeviceStatus.APPROVED
-            } else user.role == AccountRole.ADMIN
-            if (user.status != AccountStatus.APPROVED || !deviceAllowed) null else user to deviceId
+            val device = deviceId?.let { devices.findByIdAndUserId(it, user.id) }
+            val deviceAllowed = if (deviceId != null) device?.status == DeviceStatus.APPROVED else user.role == AccountRole.ADMIN
+            if (user.status != AccountStatus.APPROVED || !deviceAllowed) null else Triple(user, deviceId, device)
         }.getOrNull() ?: return reject(response)
 
-        val (user, deviceId) = result
+        val (user, deviceId, device) = result
         attributes["userId"] = user.redId
         attributes["accountId"] = user.id.toString()
         attributes["redId"] = user.redId
         attributes["role"] = user.role.name
         if (deviceId != null) attributes["deviceId"] = deviceId.toString()
+        if (device != null) attributes["protocolDeviceId"] = device.protocolDeviceId
         return true
     }
 

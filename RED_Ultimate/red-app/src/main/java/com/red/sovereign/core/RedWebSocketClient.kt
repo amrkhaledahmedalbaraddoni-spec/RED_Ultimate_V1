@@ -3,6 +3,7 @@ package com.red.sovereign.core
 import com.google.protobuf.ByteString
 import com.red.sovereign.BuildConfig
 import com.red.sovereign.auth.TokenStore
+import com.red.sovereign.crypto.EncryptedEnvelope
 import com.red.sovereign.proto.RedProtos
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -37,12 +38,20 @@ class RedWebSocketClient(
         })
     }
 
-    fun sendText(receiverRedId: String, conversationId: String, encryptedPayload: ByteArray): String {
+    fun sendEncrypted(
+        receiverRedId: String,
+        conversationId: String,
+        messageType: String,
+        senderDeviceId: Int,
+        encrypted: EncryptedEnvelope
+    ): String {
         val sender = requireNotNull(tokens.redId) { "RED ID is unavailable" }
         val id = UuidV7.next()
         val chat = RedProtos.ChatMessage.newBuilder()
             .setId(id).setConversationId(conversationId).setSenderId(sender).setReceiverId(receiverRedId)
-            .setPayload(ByteString.copyFrom(encryptedPayload)).setTimestamp(System.currentTimeMillis()).setType("TEXT").build()
+            .setPayload(ByteString.copyFrom(encrypted.bytes)).setTimestamp(System.currentTimeMillis()).setType(messageType)
+            .setSenderDeviceId(senderDeviceId).setReceiverDeviceId(encrypted.receiverDeviceId)
+            .setCiphertextType(encrypted.ciphertextType).build()
         val envelope = RedProtos.RedRED.newBuilder().setMessage(chat).build()
         check(socket?.send(envelope.toByteArray().toByteString()) == true) { "RED WebSocket is not connected" }
         return id

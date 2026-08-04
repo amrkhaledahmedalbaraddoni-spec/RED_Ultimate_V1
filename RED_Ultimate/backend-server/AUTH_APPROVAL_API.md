@@ -13,7 +13,7 @@ cp .env.example .env
 # Replace every placeholder in .env
 ```
 
-The generated Ed25519 private key is mounted read-only into the backend and is ignored by Git. Back it up securely. In production it should move to an HSM/PKCS#11 provider.
+The generated ECDSA P-256/SHA-256 private key is mounted read-only into the backend and is ignored by Git. Back it up securely. In production it should move to an HSM/PKCS#11 provider.
 
 ## 1. Register an account and its first device
 
@@ -27,9 +27,13 @@ The generated Ed25519 private key is mounted read-only into the backend and is i
   "device": {
     "deviceName": "Ahmed Pixel",
     "platform": "ANDROID",
+    "registrationId": 1234,
+    "protocolDeviceId": 1,
+    "signedPreKeyId": 42,
+    "kyberPreKeyId": 43,
     "identityKey": "BASE64_PUBLIC_IDENTITY_KEY",
-    "signedPreKey": "BASE64_SERIALIZED_SIGNED_PRE_KEY",
-    "kyberPreKey": "BASE64_SERIALIZED_KYBER_PRE_KEY",
+    "signedPreKey": "BASE64_PUBLIC_SIGNED_PRE_KEY",
+    "kyberPreKey": "BASE64_PUBLIC_KYBER_PRE_KEY",
     "signedPreKeySignature": "BASE64_SIGNATURE",
     "kyberPreKeySignature": "BASE64_SIGNATURE"
   }
@@ -70,7 +74,7 @@ Log in with the bootstrap administrator and use its Bearer token.
 Approval atomically:
 
 1. approves the account;
-2. signs every pending device fingerprint with the RED Ed25519 identity authority;
+2. signs every pending device fingerprint with the RED ECDSA P-256/SHA-256 identity authority;
 3. stores approval administrator and timestamp;
 4. publishes approved public pre-key bundles.
 
@@ -110,7 +114,7 @@ A successful use consumes that code, changes the Argon2id password hash and revo
 
 ## Identity directory and device controls
 
-- `GET /api/identity/authority`: public Ed25519 authority key.
+- `GET /api/identity/authority`: public ECDSA P-256/SHA-256 authority key.
 - `GET /api/identity/directory/{redId}`: approved public identity/pre-key bundles and device certificates; authentication required.
 - `GET /api/devices`: current account devices.
 - `DELETE /api/devices/{deviceId}`: revoke a device and all of its refresh sessions.

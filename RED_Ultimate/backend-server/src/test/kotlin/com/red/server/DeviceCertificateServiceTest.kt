@@ -13,8 +13,8 @@ import java.util.Base64
 
 class DeviceCertificateServiceTest {
     @Test
-    fun `certificate binds account device and identity fingerprint with Ed25519`() {
-        val pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+    fun `certificate binds account device and identity fingerprint with ECDSA P-256`() {
+        val pair = KeyPairGenerator.getInstance("EC").apply { initialize(java.security.spec.ECGenParameterSpec("secp256r1")) }.generateKeyPair()
         val privateFile = Files.createTempFile("red-authority", ".pk8")
         val publicFile = Files.createTempFile("red-authority", ".spki")
         Files.write(privateFile, pair.private.encoded)
@@ -28,7 +28,7 @@ class DeviceCertificateServiceTest {
         assertEquals(2, parts.size)
         val decoder = Base64.getUrlDecoder()
         val payload = decoder.decode(parts[0])
-        val verifier = Signature.getInstance("Ed25519")
+        val verifier = Signature.getInstance("SHA256withECDSA")
         verifier.initVerify(pair.public)
         verifier.update(payload)
         assertTrue(verifier.verify(decoder.decode(parts[1])))

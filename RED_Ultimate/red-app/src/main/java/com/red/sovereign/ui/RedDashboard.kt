@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -70,13 +71,16 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -91,6 +95,9 @@ import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
 import com.red.sovereign.calls.CallHistoryItem
 import com.red.sovereign.calls.CallHistoryViewModel
+import com.red.sovereign.core.RedConnectionService
+import com.red.sovereign.crypto.DecryptedMessage
+import com.red.sovereign.crypto.DecryptedMessageBus
 import com.red.sovereign.groups.GroupState
 import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.social.FeedState
@@ -103,6 +110,7 @@ import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalRoyalBlue
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
+import java.security.MessageDigest
 
 private enum class MainSection(val label: String, val icon: ImageVector) {
     FEED("المنشورات", Icons.Default.DynamicFeed),
@@ -152,7 +160,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
                 MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                MainSection.CHATS -> ChatHubScreen(groups)
+                MainSection.CHATS -> ChatHubScreen(account, groups)
                 MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
                 MainSection.CREATE -> Unit
@@ -265,14 +273,38 @@ private fun PostCard(post: Post, currentRedId: String, onLike: (Post) -> Unit, o
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
-private fun ChatHubScreen(groups: GroupViewModel) {
+private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel) {
     var tab by remember { mutableIntStateOf(0) }
+    var target by remember { mutableStateOf("") }
+    var messageText by remember { mutableStateOf("") }
+    val decrypted = remember { mutableStateListOf<DecryptedMessage>() }
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { DecryptedMessageBus.messages.collect { item ->
+        decrypted.add(item)
+        if (!item.outgoing) RedConnectionService.markRead(context, item.id, item.sequence)
+    } }
     var create by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         TabRow(tab) { Tab(tab == 0, { tab = 0 }, text = { Text("الخاص") }, icon = { Icon(Icons.Default.Chat, null) }); Tab(tab == 1, { tab = 1 }, text = { Text("المجموعات") }, icon = { Icon(Icons.Default.Groups, null) }) }
-        if (tab == 0) EmptyState(Icons.Default.Chat, "المحادثات الخاصة", "محادثات RED المشفرة ستظهر هنا بعد اكتمال مخزن جلسات libsignal.")
-        else Column(Modifier.fillMaxSize().padding(14.dp)) {
+        if (tab == 0) Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(target, { target = it.uppercase() }, Modifier.fillMaxWidth(), label = { Text("RED ID للطرف الآخر") }, singleLine = true)
+            val conversation = remember(account.redId, target) { conversationId(account.redId, target) }
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(decrypted.filter { it.conversationId == conversation }, key = { it.id }) { item ->
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), horizontalAlignment = if (item.outgoing) Alignment.End else Alignment.Start) {
+                        Text(if (item.outgoing) "أنت" else item.senderRedId, color = AqyalCyanGlow, fontSize = 11.sp)
+                        Text(item.plaintext.toString(Charsets.UTF_8))
+                    } }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
+                FilledIconButton({
+                    RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""
+                }, enabled = target.matches(Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
+            }
+        } else Column(Modifier.fillMaxSize().padding(14.dp)) {
             Button({ create = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Text(" إنشاء مجموعة") }
             when {
                 groups.state == GroupState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(30.dp))
@@ -418,3 +450,9 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 
 @Composable private fun EmptyState(icon: ImageVector, title: String, detail: String) = Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = AqyalGold, modifier = Modifier.size(62.dp)); Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, textAlign = TextAlign.Center, color = Color.Gray, modifier = Modifier.padding(top = 8.dp)) }
 @Composable private fun FeatureCard(title: String, detail: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) { Text(title, color = AqyalGold, fontWeight = FontWeight.Bold); Text(detail) } }
+
+private fun conversationId(first: String, second: String): String {
+    if (first.isBlank() || second.isBlank()) return "pending-conversation"
+    val canonical = listOf(first, second).sorted().joinToString("|")
+    return MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray()).joinToString("") { "%02x".format(it) }.take(32)
+}

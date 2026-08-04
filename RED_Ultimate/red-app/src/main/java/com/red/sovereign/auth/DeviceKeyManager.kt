@@ -3,8 +3,10 @@ package com.red.sovereign.auth
 import android.content.Context
 import android.os.Build
 import com.red.sovereign.core.SecureStore
+import org.signal.libsignal.protocol.IdentityKey
 import org.signal.libsignal.protocol.IdentityKeyPair
 import org.signal.libsignal.protocol.ecc.ECKeyPair
+import org.signal.libsignal.protocol.ecc.ECPrivateKey
 import org.signal.libsignal.protocol.kem.KEMKeyPair
 import org.signal.libsignal.protocol.kem.KEMKeyType
 import org.signal.libsignal.protocol.state.KyberPreKeyRecord
@@ -16,19 +18,47 @@ import java.util.Base64
 class DeviceKeyManager(context: Context) {
     private val store = SecureStore(context, "red_device_keys")
     private val encoder = Base64.getEncoder()
+    private val decoder = Base64.getDecoder()
 
     @Synchronized
     fun enrollment(): DeviceEnrollmentRequest {
         if (!store.contains(IDENTITY_PUBLIC)) generate()
+        val signed = signedPreKeyRecord()
+        val kyber = kyberPreKeyRecord()
+        val registration = store.get(REGISTRATION_ID)?.toInt() ?: (SecureRandom().nextInt(16_380) + 1).also { store.put(REGISTRATION_ID, it.toString()) }
+        val deviceId = store.get(PROTOCOL_DEVICE_ID)?.toInt() ?: (SecureRandom().nextInt(127) + 1).also { store.put(PROTOCOL_DEVICE_ID, it.toString()) }
         return DeviceEnrollmentRequest(
             deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+            registrationId = registration,
+            protocolDeviceId = deviceId,
+            signedPreKeyId = signed.id,
+            kyberPreKeyId = kyber.id,
             identityKey = requireValue(IDENTITY_PUBLIC),
-            signedPreKey = requireValue(SIGNED_PRE_KEY),
-            kyberPreKey = requireValue(KYBER_PRE_KEY),
+            signedPreKey = encode(signed.keyPair.publicKey.serialize()),
+            kyberPreKey = encode(kyber.keyPair.publicKey.serialize()),
             signedPreKeySignature = requireValue(SIGNED_SIGNATURE),
             kyberPreKeySignature = requireValue(KYBER_SIGNATURE)
         )
     }
+
+    fun identityKeyPair(): IdentityKeyPair {
+        enrollment()
+        return IdentityKeyPair(IdentityKey(decoder.decode(requireValue(IDENTITY_PUBLIC))), ECPrivateKey(decoder.decode(requireValue(IDENTITY_PRIVATE))))
+    }
+
+    fun registrationId(): Int {
+        enrollment()
+        store.get(REGISTRATION_ID)?.let { return it.toInt() }
+        return (SecureRandom().nextInt(16_380) + 1).also { store.put(REGISTRATION_ID, it.toString()) }
+    }
+
+    fun protocolDeviceId(): Int {
+        enrollment()
+        return requireValue(PROTOCOL_DEVICE_ID).toInt()
+    }
+
+    fun signedPreKeyRecord() = SignedPreKeyRecord(decoder.decode(requireValue(SIGNED_PRE_KEY)))
+    fun kyberPreKeyRecord() = KyberPreKeyRecord(decoder.decode(requireValue(KYBER_PRE_KEY)))
 
     private fun generate() {
         val identity = IdentityKeyPair.generate()
@@ -47,6 +77,7 @@ class DeviceKeyManager(context: Context) {
         store.put(KYBER_PRE_KEY, encode(kyber.serialize()))
         store.put(SIGNED_SIGNATURE, encode(signedSignature))
         store.put(KYBER_SIGNATURE, encode(kyberSignature))
+        store.put(REGISTRATION_ID, (random.nextInt(16_380) + 1).toString())
     }
 
     private fun encode(value: ByteArray) = encoder.encodeToString(value)
@@ -59,5 +90,7 @@ class DeviceKeyManager(context: Context) {
         const val KYBER_PRE_KEY = "kyber_pre_key"
         const val SIGNED_SIGNATURE = "signed_signature"
         const val KYBER_SIGNATURE = "kyber_signature"
+        const val REGISTRATION_ID = "registration_id"
+        const val PROTOCOL_DEVICE_ID = "protocol_device_id"
     }
 }

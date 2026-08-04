@@ -22,6 +22,10 @@ class IdentityDirectoryController(
         val bundles = devices.findAllByUserIdAndStatus(user.id, DeviceStatus.APPROVED).map { device ->
             PreKeyBundleResponse(
                 deviceId = device.id.toString(),
+                registrationId = device.registrationId,
+                protocolDeviceId = device.protocolDeviceId,
+                signedPreKeyId = device.signedPreKeyId,
+                kyberPreKeyId = device.kyberPreKeyId,
                 identityKey = encoder.encodeToString(device.identityKey),
                 signedPreKey = encoder.encodeToString(device.signedPreKey),
                 kyberPreKey = encoder.encodeToString(device.kyberPreKey),
@@ -39,6 +43,10 @@ class IdentityDirectoryController(
 data class IdentityDirectoryResponse(val redId: String, val devices: List<PreKeyBundleResponse>)
 data class PreKeyBundleResponse(
     val deviceId: String,
+    val registrationId: Int,
+    val protocolDeviceId: Int,
+    val signedPreKeyId: Int,
+    val kyberPreKeyId: Int,
     val identityKey: String,
     val signedPreKey: String,
     val kyberPreKey: String,

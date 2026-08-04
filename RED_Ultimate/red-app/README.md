@@ -22,6 +22,18 @@ Debug builds permit cleartext HTTP for LAN development. Release builds disable c
 6. Login uses the stored device ID and receives rotating access/refresh tokens.
 7. `/ws/master` uses the shared binary `RedProtos.RedRED` protocol with an Authorization header.
 
+## Navigation and call separation
+
+The five bottom destinations are:
+
+1. Posts: stories, For You/Following/Yemen filters, composer and rich-post action layout.
+2. Chats: private chats and groups as internal tabs.
+3. Central Create action: post/thread, 24-hour story, live broadcast or audio Space.
+4. Unified Calls: one future log for RED voice/video, groups, live, Spaces and PSTN, each with a route badge.
+5. Phone: an isolated gold DINSTAR area with keypad, favourites, PSTN history and contacts; voice only.
+
+RED-to-RED voice/video uses WebRTC and requires no SIM or phone number. DINSTAR is a separate, administrator-authorized PSTN voice route. The UI deliberately disables media actions until their engines are connected instead of simulating success.
+
 ## Current boundary
 
-The registration/approval/session shell and WebSocket transport are implemented. Full libsignal session stores, safety-number UI, encrypted Room message persistence, background socket service, media SFU and PSTN call orchestration remain separate gated work items; the UI does not claim these are complete.
+Registration, approval, real libsignal enrollment keys, secure local secrets, rotating sessions, foreground WebSocket transport and authorized PSTN dialing are implemented. Full libsignal session stores, safety-number UI, encrypted message persistence, WebRTC/SFU media, synchronized social feed and MinIO stories remain gated work items; incomplete controls are visibly disabled.

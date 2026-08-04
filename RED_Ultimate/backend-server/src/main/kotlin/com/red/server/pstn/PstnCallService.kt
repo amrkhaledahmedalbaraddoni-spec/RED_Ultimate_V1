@@ -2,6 +2,9 @@ package com.red.server.pstn
 
 import com.red.server.auth.model.AccountStatus
 import com.red.server.auth.repository.UserAccountRepository
+import com.red.server.calls.CallHistoryService
+import com.red.server.calls.CallRoute
+import com.red.server.calls.CallType
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Duration
@@ -13,7 +16,8 @@ import java.util.UUID
 class PstnCallService(
     private val users: UserAccountRepository,
     private val redis: StringRedisTemplate,
-    private val pstn: PstnManager
+    private val pstn: PstnManager,
+    private val history: CallHistoryService
 ) {
     fun dial(userId: UUID, suppliedNumber: String): PstnCallResponse {
         val user = users.findById(userId).orElseThrow { NoSuchElementException("User not found") }
@@ -26,11 +30,14 @@ class PstnCallService(
         if (used == 1L) redis.expire(key, Duration.ofDays(2))
         require(used <= user.pstnDailyLimit) { "Daily PSTN call limit reached" }
 
-        return runCatching { PstnCallResponse(pstn.dialGsm(number), "DIALING", number, used.toInt(), user.pstnDailyLimit) }
-            .getOrElse {
-                redis.opsForValue().decrement(key)
-                throw IllegalStateException("Asterisk rejected the PSTN call", it)
-            }
+        return runCatching {
+            val actionId = pstn.dialGsm(number)
+            history.start(user.redId, number, number, CallType.VOICE, CallRoute.DINSTAR, actionId)
+            PstnCallResponse(actionId, "DIALING", number, used.toInt(), user.pstnDailyLimit)
+        }.getOrElse {
+            redis.opsForValue().decrement(key)
+            throw IllegalStateException("Asterisk rejected the PSTN call", it)
+        }
     }
 
     private fun normalizeYemeniNumber(value: String): String {

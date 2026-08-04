@@ -87,6 +87,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
+import com.red.sovereign.calls.CallHistoryItem
+import com.red.sovereign.calls.CallHistoryViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -110,6 +112,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     var showCreate by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     val feed: FeedViewModel = viewModel()
+    val callHistory: CallHistoryViewModel = viewModel()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -118,7 +121,10 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
                 MainSection.entries.forEach { item ->
                     NavigationBarItem(
                         selected = section == item && item != MainSection.CREATE,
-                        onClick = { if (item == MainSection.CREATE) showCreate = true else section = item },
+                        onClick = {
+                            if (item == MainSection.CREATE) showCreate = true
+                            else { section = item; if (item == MainSection.CALLS) callHistory.load() }
+                        },
                         icon = {
                             if (item == MainSection.CREATE) {
                                 Box(Modifier.size(52.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) {
@@ -137,7 +143,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             when (section) {
                 MainSection.FEED -> FeedScreen(account, feed, onCreate = { showCreate = true })
                 MainSection.CHATS -> ChatHubScreen()
-                MainSection.CALLS -> UnifiedCallsScreen()
+                MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
                 MainSection.CREATE -> Unit
             }
@@ -248,8 +254,13 @@ private fun ChatHubScreen() {
 }
 
 @Composable
-private fun UnifiedCallsScreen() {
+private fun UnifiedCallsScreen(history: CallHistoryViewModel) {
     var filter by remember { mutableStateOf("الكل") }
+    val visible = history.calls.filter { call -> when (filter) {
+        "فائتة" -> call.status == "MISSED"; "صوت" -> call.type == "VOICE"; "فيديو" -> call.type == "VIDEO"
+        "جماعية" -> call.type == "GROUP"; "بث" -> call.type == "LIVE"; "مساحات" -> call.type == "SPACE"
+        "DINSTAR" -> call.route == "DINSTAR"; else -> true
+    } }
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp)) {
         Text("مركز المكالمات", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("سجل موحد لكل مكالمة من المحادثات والمجموعات والبث والمساحات والهاتف اليمني.", color = Color.LightGray)
@@ -261,7 +272,26 @@ private fun UnifiedCallsScreen() {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             items(listOf("الكل", "فائتة", "صوت", "فيديو", "جماعية", "بث", "مساحات", "DINSTAR")) { title -> FilterChip(filter == title, { filter = title }, { Text(title) }) }
         }
-        EmptyState(Icons.Default.History, "لا توجد مكالمات", "ستظهر هنا كل المكالمات مع شارة توضح: RED صوت، RED فيديو، مجموعة، بث، مساحة، أو DINSTAR صوت.")
+        when {
+            history.loading -> Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) }
+            history.error != null -> EmptyState(Icons.Default.History, "تعذر تحميل السجل", history.error.orEmpty())
+            visible.isEmpty() -> EmptyState(Icons.Default.History, "لا توجد مكالمات", "ستظهر هنا كل المكالمات مع شارة توضح مسار RED أو DINSTAR.")
+            else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(visible, key = { it.id }) { CallHistoryRow(it) } }
+        }
+    }
+}
+
+@Composable
+private fun CallHistoryRow(call: CallHistoryItem) = Card(Modifier.fillMaxWidth()) {
+    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(if (call.route == "DINSTAR") AqyalGold else AqyalCyanGlow), contentAlignment = Alignment.Center) {
+            Icon(if (call.type == "VIDEO") Icons.Default.Videocam else Icons.Default.Call, null, tint = Color.Black)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(call.peerLabel.ifBlank { call.peerId }, fontWeight = FontWeight.Bold)
+            Text("${if (call.direction == "OUTGOING") "صادرة" else "واردة"} · ${call.status}", color = if (call.status == "MISSED") Color.Red else Color.Gray, fontSize = 12.sp)
+        }
+        AssistChip({}, { Text(if (call.route == "DINSTAR") "DINSTAR صوت" else "RED ${call.type}") }, enabled = false)
     }
 }
 

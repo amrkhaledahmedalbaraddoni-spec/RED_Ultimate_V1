@@ -1,5 +1,7 @@
 package com.red.sovereign.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -92,6 +94,9 @@ import com.red.sovereign.calls.CallHistoryViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
+import com.red.sovereign.stories.Story
+import com.red.sovereign.stories.StoryState
+import com.red.sovereign.stories.StoryViewModel
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalRoyalBlue
@@ -112,7 +117,9 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     var showCreate by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     val feed: FeedViewModel = viewModel()
+    val stories: StoryViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
+    val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -141,7 +148,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
         Column(Modifier.fillMaxSize().padding(padding)) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
-                MainSection.FEED -> FeedScreen(account, feed, onCreate = { showCreate = true })
+                MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
                 MainSection.CHATS -> ChatHubScreen()
                 MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
@@ -153,7 +160,8 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     if (showCreate) CreateSheet(
         publishing = feed.state == FeedState.Publishing,
         onDismiss = { showCreate = false },
-        onPost = { text -> feed.create(text) { showCreate = false } }
+        onPost = { text -> feed.create(text) { showCreate = false } },
+        onStory = { showCreate = false; createStoryPicker.launch(arrayOf("image/*", "video/*")) }
     )
     if (showSettings) SettingsSheet(account, viewModel::logout) { showSettings = false }
 }
@@ -170,13 +178,15 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
 }
 
 @Composable
-private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, onCreate: () -> Unit) {
+private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, stories: StoryViewModel, onCreate: () -> Unit) {
     var filter by remember { mutableIntStateOf(0) }
+    var selectedStory by remember { mutableStateOf<Story?>(null) }
+    val storyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             LazyRow(Modifier.padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { StoryCircle("قصتك", true) }
-                items(listOf("صنعاء", "عدن", "فريق RED", "الأصدقاء")) { StoryCircle(it, false) }
+                item { StoryCircle(if (stories.state == StoryState.Uploading) "يرفع…" else "قصتك", true) { storyPicker.launch(arrayOf("image/*", "video/*")) } }
+                items(stories.stories, key = Story::id) { story -> StoryCircle(story.ownerDisplayName, false) { stories.viewed(story); selectedStory = story } }
             }
         }
         item {
@@ -205,10 +215,18 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, on
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
+    selectedStory?.let { story ->
+        AlertDialog(
+            onDismissRequest = { selectedStory = null },
+            title = { Text(story.ownerDisplayName) },
+            text = { Text("${story.caption.orEmpty()}\n${story.mediaType}\nالمشاهدات: ${story.viewCount}\nعارض الصور والفيديو الآمن قيد ربط renderer محلي.") },
+            confirmButton = { Button({ selectedStory = null }) { Text("إغلاق") } }
+        )
+    }
 }
 
 @Composable
-private fun StoryCircle(label: String, own: Boolean) = Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun StoryCircle(label: String, own: Boolean, click: () -> Unit) = Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = click)) {
     Box(Modifier.size(66.dp).clip(CircleShape).background(if (own) AqyalGold else AqyalCyanGlow), contentAlignment = Alignment.Center) {
         Box(Modifier.size(58.dp).clip(CircleShape).background(AqyalRoyalBlue), contentAlignment = Alignment.Center) {
             Icon(if (own) Icons.Default.Add else Icons.Default.Person, null)
@@ -348,7 +366,7 @@ private fun DialPad(enabled: Boolean, viewModel: AuthViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (String) -> Unit) {
+private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (String) -> Unit, onStory: () -> Unit) {
     var composer by remember { mutableStateOf(false) }; var text by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -358,7 +376,7 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
                 Button({ if (text.isNotBlank()) onPost(text.trim()) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank() && !publishing) { if (publishing) CircularProgressIndicator(Modifier.size(20.dp)) else Text("نشر محلي") }
             } else {
                 CreateOption(Icons.Default.DynamicFeed, "منشور أو سلسلة", "نص طويل، اقتباس، استطلاع، صور وفيديو", true) { composer = true }
-                CreateOption(Icons.Default.AddCircle, "حالة 24 ساعة", "صورة أو فيديو قصير — قيد الربط", false) {}
+                CreateOption(Icons.Default.AddCircle, "حالة 24 ساعة", "صورة أو فيديو يُحذف تلقائياً", true, onStory)
                 CreateOption(Icons.Default.LiveTv, "بث مباشر", "فيديو عبر SFU المحلي — قيد الربط", false) {}
                 CreateOption(Icons.Default.RecordVoiceOver, "مساحة صوتية", "مؤتمر عام مثل Spaces — قيد الربط", false) {}
             }

@@ -10,6 +10,11 @@ spring:
       port: 6379
       password: ${REDIS_PASSWORD:}
 
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 105MB
+
   datasource:
     url: jdbc:postgresql://db-postgres:5432/red_sovereign
     username: ${DB_USER:red_user}

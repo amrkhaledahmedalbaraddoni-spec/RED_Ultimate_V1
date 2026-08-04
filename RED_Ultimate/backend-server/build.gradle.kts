@@ -46,6 +46,9 @@ dependencies {
     // Argon2id password hashing
     implementation("org.bouncycastle:bcprov-jdk18on:1.79")
 
+    // Local S3-compatible object storage
+    implementation("io.minio:minio:8.5.17")
+
     // OkHttp for Dinstar API
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

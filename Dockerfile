@@ -19,7 +19,7 @@ RUN chmod +x gradlew \
     && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --write-verification-metadata sha256 --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 RUN echo '=== RED_GENERATED_VERIFICATION_CHECKSUMS ===' \
-    && awk '/<component / { component=$0; wanted=($0 ~ /hilt-android-gradle-plugin.*2.52/ || $0 ~ /kotlin-serialization.*2.2.21/ || $0 ~ /slf4j-api.*1.7.30/) } wanted && /<artifact / { artifact=$0 } wanted && /<sha256 / { print "VERIFY|" component "|" artifact "|" $0 }' gradle/verification-metadata.xml
+    && python3 -c 'import xml.etree.ElementTree as E; r=E.parse("gradle/verification-metadata.xml").getroot(); ns={"v":"https://schema.gradle.org/dependency-verification"}; wanted={("com.google.dagger","hilt-android-gradle-plugin","2.52"),("org.jetbrains.kotlin","kotlin-serialization","2.2.21"),("org.slf4j","slf4j-api","1.7.30")}; [print("VERIFY|"+c.attrib["group"]+"|"+c.attrib["name"]+"|"+c.attrib["version"]+"|"+a.attrib["name"]+"|"+s.attrib["value"]) for c in r.findall(".//v:component",ns) if (c.attrib["group"],c.attrib["name"],c.attrib["version"]) in wanted for a in c.findall("v:artifact",ns) for s in a.findall("v:sha256",ns)]'
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

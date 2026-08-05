@@ -10,6 +10,20 @@ HTTP_PORT="${RED_HTTP_PORT:-8088}"
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is required"; }
+wait_container_ready() {
+  name="$1"; attempt=0
+  while [ "$attempt" -lt 30 ]; do
+    state="$(docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name" 2>/dev/null || true)"
+    runtime="${state%%|*}"; health="${state#*|}"
+    if [ "$runtime" = running ] && { [ "$health" = healthy ] || [ "$health" = none ]; }; then
+      printf '%s readiness: PASS (%s/%s)\n' "$name" "$runtime" "$health"; return 0
+    fi
+    case "$runtime" in exited|dead|restarting) docker logs --tail 80 "$name" >&2 || true; fail "$name failed readiness: $runtime/$health" ;; esac
+    attempt=$((attempt + 1)); sleep 3
+  done
+  docker inspect "$name" --format '{{json .State}}' >&2 || true
+  fail "$name did not become ready"
+}
 
 need docker
 need openssl
@@ -83,6 +97,8 @@ done
 printf ' PASS\n'
 
 curl -fsS "http://127.0.0.1:$HTTP_PORT/sfu-health" >/dev/null && printf 'SFU health: PASS\n' || fail "SFU health failed"
+wait_container_ready red-admin-ui
+wait_container_ready red-pstn-gateway
 
 if [ "$BUILD_ANDROID" = "1" ]; then
   printf 'Building verified backend + Android artifact image (this downloads the Android SDK image)...\n'

@@ -30,6 +30,28 @@ function New-Hex([int]$Bytes) {
     return (-join ($buffer | ForEach-Object { $_.ToString("x2") }))
 }
 
+function Wait-ContainerReady([string]$Name) {
+    foreach ($attempt in 1..30) {
+        $state = (& docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $Name 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $state) {
+            $parts = $state.Trim().Split('|')
+            $runtime = $parts[0]
+            $health = $parts[1]
+            if ($runtime -eq 'running' -and ($health -eq 'healthy' -or $health -eq 'none')) {
+                Write-Host "$Name readiness: PASS ($runtime/$health)"
+                return
+            }
+            if ($runtime -eq 'exited' -or $runtime -eq 'dead' -or $runtime -eq 'restarting') {
+                & docker logs --tail 80 $Name
+                throw "$Name failed readiness: $runtime/$health"
+            }
+        }
+        Start-Sleep -Seconds 3
+    }
+    & docker inspect $Name --format '{{json .State}}'
+    throw "$Name did not become ready"
+}
+
 $OpenSslExe = $null
 $OpenSslCommand = Get-Command openssl -ErrorAction SilentlyContinue
 if ($OpenSslCommand) { $OpenSslExe = $OpenSslCommand.Source }
@@ -132,6 +154,8 @@ try {
     $sfu = Invoke-WebRequest -Uri "http://127.0.0.1:$HttpPort/sfu-health" -UseBasicParsing -TimeoutSec 5
     if ($sfu.StatusCode -ne 200) { throw "SFU health failed" }
     Write-Host "SFU health: PASS"
+    Wait-ContainerReady "red-admin-ui"
+    Wait-ContainerReady "red-pstn-gateway"
 } finally { Pop-Location }
 
 if ($BuildAndroid) {

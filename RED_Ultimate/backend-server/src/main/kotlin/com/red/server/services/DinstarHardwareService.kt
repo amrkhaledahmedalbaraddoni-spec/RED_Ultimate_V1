@@ -133,8 +133,9 @@ class DinstarHardwareService(
             val entity = HttpEntity(payload, createAuthHeaders())
             val response = restTemplate.postForEntity(url, entity, Map::class.java)
             
-            println("🔴 AQYAL PSTN Master: Successfully dispatched call to $phoneNumber via Dinstar Slot $slotIndex")
-            return response.body ?: mapOf("status" to "DIALING", "target" to phoneNumber, "slot" to slotIndex)
+            @Suppress("UNCHECKED_CAST")
+            return response.body as? Map<String, Any>
+                ?: mapOf("status" to "DIALING", "target" to phoneNumber, "slot" to slotIndex)
         } catch (e: Exception) {
             throw IllegalStateException("DINSTAR rejected or did not receive the call request", e)
         }

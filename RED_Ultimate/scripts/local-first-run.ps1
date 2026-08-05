@@ -178,6 +178,8 @@ try {
 if ($BuildAndroid) {
     Push-Location $RepoRoot
     try {
+        & (Join-Path $PSScriptRoot "prefetch-android-crypto.ps1")
+        if (-not $?) { throw "Verified libsignal prefetch failed" }
         $Artifacts = Join-Path $RepoRoot "local-artifacts"
         New-Item -ItemType Directory -Force $Artifacts | Out-Null
         & docker build --file Dockerfile --target android-artifact --build-arg "RED_SERVER_URL=http://${ServerIp}:$HttpPort" --output "type=local,dest=$Artifacts" .

@@ -15,6 +15,7 @@ ARG RED_SERVER_URL=http://127.0.0.1
 WORKDIR /build/RED_Ultimate
 COPY RED_Ultimate/build.gradle.kts RED_Ultimate/settings.gradle.kts RED_Ultimate/gradle.properties RED_Ultimate/gradlew ./
 COPY RED_Ultimate/gradle/ gradle/
+COPY RED_Ultimate/local-maven/ local-maven/
 COPY RED_Ultimate/build-logic/ build-logic/
 COPY RED_Ultimate/wire-handler/ wire-handler/
 COPY RED_Ultimate/red-app/ red-app/

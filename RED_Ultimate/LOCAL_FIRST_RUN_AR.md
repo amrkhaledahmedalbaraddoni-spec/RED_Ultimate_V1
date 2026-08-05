@@ -46,10 +46,10 @@ BUILD_ANDROID=1 ./scripts/local-first-run.sh 192.168.1.50
 4. يشغّل `docker compose config --quiet`.
 5. يبني ويشغّل PostgreSQL وMongoDB وRedis وMinIO وbackend وSFU وTURN وAsterisk ولوحة الإدارة وNginx.
 6. ينتظر `/health` و`/sfu-health` بدل ادعاء نجاح مبكر.
-7. عند طلب Android، يستخدم target خفيفًا يبني Android فقط مع التحقق الصارم ويصدر مباشرة:
+7. عند طلب Android، ينزّل ملفات libsignal الكبيرة إلى cache محلي resumable ويتحقق من SHA-256، ثم يستخدم target خفيفًا يبني Android فقط ويصدر مباشرة:
    - `local-artifacts/red-app-debug.apk`
 
-الخادم يُبنى ويُختبر ضمن Compose/CI، لذلك لا يعاد بناؤه في مرحلة استخراج APK المحلية.
+يمكن تشغيل `scripts/prefetch-android-crypto.ps1` منفصلًا عند الشبكات البطيئة. محتوى `local-maven/` مستثنى من Git، ولا يُقبل أي artifact لا يطابق checksums المثبتة. الخادم يُبنى ويُختبر ضمن Compose/CI، لذلك لا يعاد بناؤه في مرحلة استخراج APK المحلية.
 
 ## الوصول
 

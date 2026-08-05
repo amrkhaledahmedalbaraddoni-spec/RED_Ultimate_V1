@@ -25,6 +25,11 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        maven {
+            url = uri("$rootDir/local-maven")
+            content { includeGroup("org.signal") }
+            metadataSources { gradleMetadata() }
+        }
         // libsignal-android is a large AAR. Use two HTTPS front doors for Maven Central;
         // strict SHA-256 verification still rejects any byte not pinned in metadata.
         maven {

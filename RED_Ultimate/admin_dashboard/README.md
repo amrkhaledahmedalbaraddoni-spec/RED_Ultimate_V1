@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# admin_dashboard/ — لوحة الإدارة القانونية
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط — تُبنى في CI وDocker Compose
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+تطبيق React 19 + TypeScript/Vite/Ant Design لموافقة الحسابات والأجهزة، ضبط صلاحية DINSTAR وحدودها، عرض الصحة وسجل التدقيق. يتصل فقط بواجهات backend عبر Nginx؛ لا يتصل بقواعد البيانات مباشرة.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/` الصفحات وعميل API، `Dockerfile` بناء إنتاجي، `dashboard.nginx.conf` تقديم SPA.
 
 ## العلاقة بباقي المشروع
 

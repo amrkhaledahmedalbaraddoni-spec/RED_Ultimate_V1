@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# scripts/ — أتمتة التشغيل والأمان
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط للمطور/المشغل
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+أدوات تشغيل Alpha محليًا على Windows وPOSIX وتوليد سلطة هوية P-256. تنشئ أسرارًا محلية ولا ترفعها.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`local-first-run.ps1`، `local-first-run.sh`، `generate-local-identity-authority.sh`.
 
 ## العلاقة بباقي المشروع
 

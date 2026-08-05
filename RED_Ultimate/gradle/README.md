@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# gradle/ — إعدادات واعتماديات Gradle
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط وحساس أمنيًا
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+Version catalogs وGradle Wrapper و`verification-metadata.xml`. ملف التحقق يثبت SHA-256 للاعتماديات ويُستخدم مع `--dependency-verification strict`.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`libs.versions.toml` الكتالوج الرئيسي، كتالوجات QA، `wrapper/`، metadata.
 
 ## العلاقة بباقي المشروع
 

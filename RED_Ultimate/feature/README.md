@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# feature/ — ميزات Signal المنفصلة
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مرجع — غير مدرج
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+وحدات camera وmedia-send وregistration من المصدر التاريخي. تسجيل RED القانوني موجود في `red-app` و`backend-server` ولا يعتمد هذه الوحدة.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`camera/` و`media-send/` و`registration/`.
 
 ## العلاقة بباقي المشروع
 

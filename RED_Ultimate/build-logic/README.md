@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# build-logic/ — منطق بناء Gradle
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط كـ included build
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+Plugins وأدوات QA مشتركة يستدعيها بناء الجذر. علاقته مباشرة بـ `build.gradle.kts` و`settings.gradle.kts` ولا يحتوي ميزات المنتج.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`plugins/` اتفاقيات Gradle، `tools/` أدوات وفحوص، `settings.gradle.kts` للبناء المركب.
 
 ## العلاقة بباقي المشروع
 

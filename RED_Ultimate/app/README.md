@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# app/ — فورك Signal التاريخي
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** Gold mine مرجعي — خارج Gradle graph
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+قاعدة Signal-Android كبيرة محفوظة لاستخراج تقنيات مدروسة مثل نماذج التخزين وتجارب الواجهة. المنتج القانوني ليس هذا المجلد؛ إدخاله كاملًا في البناء سيعيد الاعتماد على بنية Signal السحابية والتكرارات.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+مصادر `org.thoughtcrime.*` وملفات native/ProGuard وموارد Signal.
 
 ## العلاقة بباقي المشروع
 

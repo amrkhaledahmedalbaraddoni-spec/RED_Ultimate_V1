@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# backend-server/ — خادم RED القانوني
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط — Spring Boot/Kotlin/JVM 21
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+يوفر التسجيل دون هاتف، الموافقة الإدارية، JWT/refresh، شهادات الأجهزة، دليل الهوية وPQXDH، الرسائل، المنشورات، المجموعات، الوسائط والحالات، سجل المكالمات، وصلاحيات DINSTAR. يستخدم PostgreSQL وMongoDB وRedis وMinIO.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/main/kotlin/com/red/server/` المصدر، `db/migration/V1..V9` Flyway، `src/test/` اختبارات، `Dockerfile` التشغيل.
 
 ## العلاقة بباقي المشروع
 

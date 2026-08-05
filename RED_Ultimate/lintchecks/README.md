@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# lintchecks/ — Android Lint مخصص
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مرجع QA — غير مدرج حاليًا
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+Detectors واختباراتها من الشجرة التاريخية. تحتاج التسجيل في Gradle وتحديث package targets قبل الاعتماد عليها.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/main` Detectors و`src/test` اختبارات.
 
 ## العلاقة بباقي المشروع
 

@@ -1,70 +1,75 @@
-# RED Android
+# RED_Ultimate/ — دليل المشروع القانوني
 
-RED is a simple, powerful, and secure messenger that uses your phone's data connection (WiFi/4G/5G) to communicate securely.
+هذا المجلد يحتوي المنتج والبنية التحتية ومصادر Signal التاريخية. **وجود مجلد لا يعني أنه يدخل البناء**؛ المرجع الحاسم هو [`settings.gradle.kts`](settings.gradle.kts).
 
-Millions of people use RED every day for free and instantaneous communication anywhere in the world. Send and receive high-fidelity messages, participate in HD voice/video calls, and explore a growing set of new features that help you stay connected. 
+## graph الحالي
 
-RED’s advanced privacy-preserving technology is always enabled, so you can focus on sharing the moments that matter with the people who matter to you.
+```text
+:app → red-app/
+:shared-proto → shared-proto/
+included build → build-logic/
 
-Currently available on the [Play Store](https://play.google.com/store/apps/details?id=com.red.sovereign) and [red.local](https://red.local/android/apk/).
+backend-server/ بناء Spring مستقل يضم shared-proto
+admin_dashboard/, media-sfu/, pstn-asterisk/ تبنيها Docker/CI
+```
 
-<a href='https://play.google.com/store/apps/details?id=com.red.sovereign&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png' height='80px'/></a>
+## المجلدات الأربعة والعشرون
 
-Also available on [iOS](https://github.com/signalapp/signal-ios) and [Desktop](https://github.com/signalapp/signal-desktop).
+| المجلد | الحالة والدور |
+|---|---|
+| [`red-app/`](red-app/README.md) | تطبيق Android القانوني `:app` |
+| [`backend-server/`](backend-server/README.md) | Backend القانوني |
+| [`shared-proto/`](shared-proto/README.md) | Protobuf الموحد |
+| [`admin_dashboard/`](admin_dashboard/README.md) | لوحة الإدارة القانونية |
+| [`media-sfu/`](media-sfu/README.md) | mediasoup SFU |
+| [`pstn-asterisk/`](pstn-asterisk/README.md) | DINSTAR/Asterisk صوت فقط |
+| [`scripts/`](scripts/README.md) | تشغيل محلي ومفاتيح الهوية |
+| [`gradle/`](gradle/README.md) | Wrapper/catalogs/dependency verification |
+| [`build-logic/`](build-logic/README.md) | منطق وأدوات Gradle |
+| [`wire-handler/`](wire-handler/README.md) | Wire build-time handler |
+| [`app/`](app/README.md) | Signal gold mine خارج البناء |
+| [`android/`](android/README.md) | AQYAL reference خارج البناء |
+| [`app-android/`](app-android/README.md) | DevelopedChat reference خارج البناء |
+| [`core/`](core/README.md) | مكتبات Signal قديمة خارج graph |
+| [`lib/`](lib/README.md) | مكتبات Signal قديمة خارج graph |
+| [`feature/`](feature/README.md) | ميزات Signal قديمة خارج graph |
+| [`demo/`](demo/README.md) | عينات غير منشورة |
+| [`fast-lint/`](fast-lint/README.md) | Lint تاريخي غير مسجل حاليًا |
+| [`lintchecks/`](lintchecks/README.md) | Detectors تاريخية غير مسجلة |
+| [`benchmark/`](benchmark/README.md) | Macrobenchmark تاريخي |
+| [`microbenchmark/`](microbenchmark/README.md) | Microbenchmark تاريخي |
+| [`baseline-profile/`](baseline-profile/README.md) | Profile generator تاريخي |
+| [`reproducible-builds/`](reproducible-builds/README.md) | أدوات مقارنة APK تحتاج مواءمة |
+| [`infrastructure/`](infrastructure/README.md) | أدوات مساعدة؛ Compose هو المرجع |
 
-## Contributing Bug Reports
-We use GitHub for bug tracking. Please search the existing issues for your bug and create a new one if the issue is not yet tracked!
+## ملفات التشغيل الأساسية
 
-https://github.com/signalapp/RED-Android/issues
+- `docker-compose.yml`: الخدمات المحلية والـ volumes والشبكة.
+- `nginx.conf`: بوابة HTTP/WebSocket/SFU/admin.
+- `.env.example`: أسماء المتغيرات دون أسرار حقيقية.
+- `LOCAL_FIRST_RUN_AR.md`: تجربة Windows/Linux الأولى.
+- `W0_MODULE_BOUNDARIES.md`: ما هو قانوني وما هو مرجع.
 
-## Joining the Beta
-Want to live life on the bleeding edge and help out with testing?
+## التوثيقات الشاملة
 
-You can subscribe to RED Android Beta releases here:
-https://play.google.com/apps/testing/com.red.sovereign
+- [`docs/01-PROJECT-OVERVIEW.md`](docs/01-PROJECT-OVERVIEW.md)
+- [`docs/02-DATABASES.md`](docs/02-DATABASES.md)
+- [`docs/03-SERVER-ADMIN-PANEL.md`](docs/03-SERVER-ADMIN-PANEL.md)
+- [`docs/04-APPS.md`](docs/04-APPS.md)
 
-If you're interested in a life of peace and tranquility, stick with the standard releases.
+## أوامر التحقق
 
-## Contributing Translations
-Interested in helping translate RED? Contribute here:
+```bash
+# Backend + tests
+cd backend-server && gradle clean build
 
-https://community.signalusers.org/c/translation-feedback/
+# Android المحلي
+cd .. && ./gradlew :app:assembleDebug \
+  -PRED_SERVER_URL=http://SERVER_IP \
+  --dependency-verification strict
 
-## Contributing Code
+# المنظومة
+./scripts/local-first-run.sh SERVER_IP
+```
 
-If you're new to the RED codebase, we recommend going through our issues and picking out a simple bug to fix in order to get yourself familiar. Also please have a look at the [CONTRIBUTING.md](https://github.com/signalapp/RED-Android/blob/main/CONTRIBUTING.md), that might answer some of your questions.
-
-For larger changes and feature ideas, we ask that you propose it on the [unofficial Community Forum](https://community.signalusers.org) for a high-level discussion with the wider community before implementation.
-
-## Contributing Ideas
-Have something you want to say about RED projects or want to be part of the conversation? Get involved in the [community forum](https://community.signalusers.org).
-
-Help
-====
-## Support
-For troubleshooting and questions, please visit our support center!
-
-https://support.red.local/
-
-## Documentation
-Looking for documentation? Check out the wiki!
-
-https://github.com/signalapp/RED-Android/wiki
-
-# Legal things
-## Cryptography Notice
-
-This distribution includes cryptographic software. The country in which you currently reside may have restrictions on the import, possession, use, and/or re-export to another country, of encryption software.
-BEFORE using any encryption software, please check your country's laws, regulations and policies concerning the import, possession, or use, and re-export of encryption software, to see if this is permitted.
-See <http://www.wassenaar.org/> for more information.
-
-The U.S. Government Department of Commerce, Bureau of Industry and Security (BIS), has classified this software as Export Commodity Control Number (ECCN) 5D002.C.1, which includes information security software using or performing cryptographic functions with asymmetric algorithms.
-The form and manner of this distribution makes it eligible for export under the License Exception ENC Technology Software Unrestricted (TSU) exception (see the BIS Export Administration Regulations, Section 740.13) for both object code and source code.
-
-## License
-
-Copyright 2013 RED Messenger, LLC
-
-Licensed under the GNU AGPLv3: https://www.gnu.org/licenses/agpl-3.0.html
-
-Google Play and the Google Play logo are trademarks of Google LLC.
+على Windows استخدم `scripts/local-first-run.ps1`. لا تحفظ `.env` أو `secrets/` أو artifacts في Git.

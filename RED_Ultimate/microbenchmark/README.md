@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# microbenchmark/ — Microbenchmark تاريخي
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** غير مدرج حاليًا
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+قياسات دقيقة موروثة لخوارزميات/بروتوكولات. ليست دليل أداء للنسخة الحالية قبل إعادة ربطها بـ `red-app`.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/androidTest` وملف ProGuard للاختبارات.
 
 ## العلاقة بباقي المشروع
 

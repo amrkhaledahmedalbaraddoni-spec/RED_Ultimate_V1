@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# pstn-asterisk/ — جسر DINSTAR الصوتي
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط اختياري — منفصل عن RED WebRTC
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+Asterisk مخصص لمسار Android → backend authorization → AMI/Asterisk → DINSTAR → SIM. لا يحتوي عميل RED WebRTC. الإعدادات الحساسة تُولد وقت التشغيل، والوارد غير المربوط يُرفض.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`Dockerfile`، `docker-entrypoint.sh` لتوليد AMI/PJSIP، `extensions.conf` dialplan مقيد.
 
 ## العلاقة بباقي المشروع
 

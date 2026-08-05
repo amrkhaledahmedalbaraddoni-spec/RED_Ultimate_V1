@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# demo/ — تطبيقات وأمثلة مكتبات
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مرجع/عينات — غير مدرج
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+عينات لاختبار مكتبات مثل الكاميرا والمحرر والنقل. ليست تطبيقات RED ولا تُنشر.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+كل مجلد فرعي demo مستقل تاريخيًا.
 
 ## العلاقة بباقي المشروع
 

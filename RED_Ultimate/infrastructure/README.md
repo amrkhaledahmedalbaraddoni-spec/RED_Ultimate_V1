@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# infrastructure/ — أدوات بنية تحتية إضافية
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مساعد — Compose هو المرجع
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+يحوي سكربتات قديمة/مساعدة للتهيئة. المصدر التشغيلي القانوني هو `docker-compose.yml` وNginx وملفات كل خدمة؛ لا تشغل سكربتًا هنا دون مراجعته.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`setup-env.sh` أداة تهيئة تاريخية.
 
 ## العلاقة بباقي المشروع
 

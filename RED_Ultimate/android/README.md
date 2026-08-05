@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# android/ — مصدر AQYAL التاريخي
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مرجع استخراج — خارج Gradle graph
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+تجربة Android سابقة تحتوي أفكار واجهة AQYAL والقصص والمكالمات. لا تمثل APK الحالي ولا يجوز إضافة اعتماد مباشر عليها؛ تُنقل الأفكار المنتقاة إلى `red-app/` بعد الاختبار.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`app/` و`core/` و`features/` مصادر تاريخية غير مبنية.
 
 ## العلاقة بباقي المشروع
 

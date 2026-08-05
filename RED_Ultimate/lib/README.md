@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# lib/ — مكتبات Signal القديمة
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** Gold mine مرجعي — غير مدرج
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+مجموعة مكتبات Android/Java من شجرة Signal. وجودها لا يعني تضمينها في المنتج؛ يُستخرج منها فقط ما يلزم مع مراجعة الترخيص والأمان.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+مجلدات مكتبات مستقلة مثل archive/contacts وغيرها.
 
 ## العلاقة بباقي المشروع
 

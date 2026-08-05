@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# fast-lint/ — محرك Lint سريع
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مصدر QA تاريخي — غير مدرج حاليًا
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+محرك AST وقواعد سريعة موروثة. مهمة `ci` تشير إليه تاريخيًا، لكن الوحدة غير مسجلة في graph القانوني؛ يلزم ربط صريح قبل تشغيلها.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/main` المحرك والقواعد، `src/test` اختباراته.
 
 ## العلاقة بباقي المشروع
 

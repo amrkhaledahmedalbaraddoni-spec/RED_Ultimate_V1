@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# shared-proto/ — بروتوكول RED الموحد
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط — مشترك Android/backend
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+المصدر الوحيد لرسائل Protobuf القانونية، ويُبنى كوحدة JVM مشتركة. endpoint الرسائل هو `/ws/master`؛ أي proto تاريخي خارج `src/main/proto` غير قانوني.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`src/main/proto/red_protocol.proto` و`build.gradle.kts`.
 
 ## العلاقة بباقي المشروع
 

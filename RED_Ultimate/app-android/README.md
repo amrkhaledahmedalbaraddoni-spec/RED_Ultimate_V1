@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# app-android/ — نموذج DevelopedChat التاريخي
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** مرجع استخراج — خارج Gradle graph
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+نموذج مبكر للموافقة والمحادثات وPSTN. بقي للمقارنة فقط؛ يحتوي واجهات وتجارب قديمة ولا يحدد API أو نموذج الأمان الحالي.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`features/` و`core/` و`app/` نماذج Kotlin/Compose قديمة.
 
 ## العلاقة بباقي المشروع
 

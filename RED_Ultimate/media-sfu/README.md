@@ -1,14 +1,14 @@
-# red-app/ — تطبيق Android القانوني
+# media-sfu/ — خادم وسائط RED
 
-> **الحالة:** نشط — Gradle module `:app`
+> **الحالة:** نشط — Node 22/mediasoup
 
 ## الوظيفة
 
-التطبيق الذي ينتج APK: حساب username، موافقة الإدارة، هوية جهاز محلية، libsignal PQXDH/Double Ratchet، WebSocket، feed/groups/stories وسجل المكالمات وهاتف DINSTAR المنفصل. الميزات غير المكتملة معطلة بصريًا.
+SFU محلي للمكالمات الجماعية والبث والمساحات. يتحقق من JWT ويدير rooms/transports/producers/consumers؛ الإشارة الفردية الأساسية تمر عبر backend. يحتاج announced IP ومنافذ UDP وTURN للاختبار الحقيقي.
 
 ## المحتوى
 
-`src/main/java/com/red/sovereign/` المصدر، `AndroidManifest.xml`، `build.gradle.kts`، اختبارات الوحدة.
+`server.js` الخادم، `package-lock.json` تثبيت حتمي، `Dockerfile` runtime.
 
 ## العلاقة بباقي المشروع
 

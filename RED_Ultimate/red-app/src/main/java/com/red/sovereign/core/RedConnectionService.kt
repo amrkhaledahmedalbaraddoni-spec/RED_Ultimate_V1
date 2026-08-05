@@ -49,6 +49,11 @@ class RedConnectionService : Service() {
         signal = SignalSessionManager(this)
         keyManager = DeviceKeyManager(this)
         socket = RedWebSocketClient(tokenStore, ::onEnvelope, ::onState)
+        scope.launch {
+            if (signal.replenishPreKeys() is ApiResult.Error) {
+                notifyConnection("تعذر تحديث مفاتيح الجلسات الآمنة — ستتم المحاولة عند إعادة الاتصال")
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

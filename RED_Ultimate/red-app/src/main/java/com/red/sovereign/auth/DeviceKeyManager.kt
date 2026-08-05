@@ -59,6 +59,7 @@ class DeviceKeyManager(context: Context) {
 
     fun signedPreKeyRecord() = SignedPreKeyRecord(decoder.decode(requireValue(SIGNED_PRE_KEY)))
     fun kyberPreKeyRecord() = KyberPreKeyRecord(decoder.decode(requireValue(KYBER_PRE_KEY)))
+    fun sign(message: ByteArray): ByteArray = identityKeyPair().privateKey.calculateSignature(message)
 
     private fun generate() {
         val identity = IdentityKeyPair.generate()

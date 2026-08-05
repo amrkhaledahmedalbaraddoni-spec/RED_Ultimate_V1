@@ -23,7 +23,10 @@ class SignalSessionManager(context: Context) {
     private val keys = DeviceKeyManager(context)
     private val store = PersistentSignalProtocolStore(context, keys)
     private val directory = IdentityDirectoryApi(AuthorizedApiClient(tokens))
+    private val preKeyPool = PreKeyPoolManager(context)
     private val decoder = Base64.getDecoder()
+
+    suspend fun replenishPreKeys(): ApiResult<PreKeyStock> = preKeyPool.replenishIfNeeded()
 
     suspend fun encrypt(remoteRedId: String, plaintext: ByteArray): ApiResult<List<EncryptedEnvelope>> {
         require(plaintext.isNotEmpty() && plaintext.size <= 256 * 1024)
@@ -31,11 +34,17 @@ class SignalSessionManager(context: Context) {
         if (result is ApiResult.Error) return result
         result as ApiResult.Success
         if (result.value.devices.isEmpty()) return ApiResult.Error(404, "NO_APPROVED_REMOTE_DEVICE")
-        val envelopes = result.value.devices.map { device ->
-            val remote = SignalProtocolAddress(remoteRedId, device.protocolDeviceId)
+        val envelopes = mutableListOf<EncryptedEnvelope>()
+        for (directoryDevice in result.value.devices) {
+            val remote = SignalProtocolAddress(remoteRedId, directoryDevice.protocolDeviceId)
             if (!store.containsSession(remote)) {
+                val consumed = directory.consumePreKey(remoteRedId, directoryDevice.deviceId)
+                if (consumed is ApiResult.Error) return consumed
+                val device = (consumed as ApiResult.Success).value
+                val oneTimeKey = device.oneTimePreKey?.let { ECPublicKey(decoder.decode(it)) }
                 val bundle = PreKeyBundle(
-                    device.registrationId, device.protocolDeviceId, PreKeyBundle.NULL_PRE_KEY_ID, null,
+                    device.registrationId, device.protocolDeviceId,
+                    device.oneTimePreKeyId ?: PreKeyBundle.NULL_PRE_KEY_ID, oneTimeKey,
                     device.signedPreKeyId, ECPublicKey(decoder.decode(device.signedPreKey)), decoder.decode(device.signedPreKeySignature),
                     IdentityKey(decoder.decode(device.identityKey)), device.kyberPreKeyId,
                     KEMPublicKey(decoder.decode(device.kyberPreKey)), decoder.decode(device.kyberPreKeySignature)
@@ -43,7 +52,7 @@ class SignalSessionManager(context: Context) {
                 SessionBuilder(store, remote).process(bundle)
             }
             val ciphertext = SessionCipher(store, remote).encrypt(plaintext)
-            EncryptedEnvelope(device.protocolDeviceId, ciphertext.type, ciphertext.serialize())
+            envelopes += EncryptedEnvelope(directoryDevice.protocolDeviceId, ciphertext.type, ciphertext.serialize())
         }
         return ApiResult.Success(result.code, envelopes)
     }

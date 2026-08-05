@@ -11,7 +11,10 @@ import org.signal.libsignal.protocol.InvalidKeyIdException
 import org.signal.libsignal.protocol.NoSessionException
 import org.signal.libsignal.protocol.ReusedBaseKeyException
 import org.signal.libsignal.protocol.SignalProtocolAddress
+import org.signal.libsignal.protocol.ecc.ECKeyPair
 import org.signal.libsignal.protocol.ecc.ECPublicKey
+import org.signal.libsignal.protocol.kem.KEMKeyPair
+import org.signal.libsignal.protocol.kem.KEMKeyType
 import org.signal.libsignal.protocol.groups.state.SenderKeyRecord
 import org.signal.libsignal.protocol.state.IdentityKeyStore
 import org.signal.libsignal.protocol.state.KyberPreKeyRecord
@@ -20,6 +23,7 @@ import org.signal.libsignal.protocol.state.SessionRecord
 import org.signal.libsignal.protocol.state.SignalProtocolStore
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.UUID
 
 /** Durable libsignal 0.86.5 store. All records contain cryptographic state, never plaintext messages. */
@@ -68,6 +72,28 @@ class PersistentSignalProtocolStore(context: Context, private val keys: DeviceKe
     override fun containsPreKey(preKeyId: Int) = exists("prekeys", "id = ?", arrayOf(preKeyId.toString()))
     override fun removePreKey(preKeyId: Int) { writableDatabase.delete("prekeys", "id = ?", arrayOf(preKeyId.toString())) }
 
+    /** Creates fresh private records locally; callers upload public material only. */
+    @Synchronized
+    fun generateOneTimeBatch(count: Int): OneTimePreKeyBatch {
+        require(count in 1..100)
+        val random = SecureRandom()
+        val ec = ArrayList<PreKeyRecord>(count)
+        val kyber = ArrayList<KyberPreKeyRecord>(count)
+        repeat(count) {
+            var ecId: Int
+            do ecId = random.nextInt(Int.MAX_VALUE) while (containsPreKey(ecId))
+            PreKeyRecord(ecId, ECKeyPair.generate()).also { storePreKey(ecId, it); ec += it }
+
+            var kyberId: Int
+            do kyberId = random.nextInt(Int.MAX_VALUE) while (containsKyberPreKey(kyberId))
+            val pair = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
+            val signature = keys.sign(pair.publicKey.serialize())
+            KyberPreKeyRecord(kyberId, System.currentTimeMillis(), pair, signature)
+                .also { storeKyberPreKey(kyberId, it); kyber += it }
+        }
+        return OneTimePreKeyBatch(ec, kyber)
+    }
+
     override fun loadSession(address: SignalProtocolAddress): SessionRecord = blob("sessions", "name = ? AND device = ?", arrayOf(address.name, address.deviceId.toString()))?.let(::SessionRecord) ?: SessionRecord()
     override fun loadExistingSessions(addresses: List<SignalProtocolAddress>): List<SessionRecord> = addresses.map { address ->
         if (!containsSession(address)) throw NoSessionException(address, "No session for $address")
@@ -101,7 +127,9 @@ class PersistentSignalProtocolStore(context: Context, private val keys: DeviceKe
         val inserted = writableDatabase.insertWithOnConflict("kyber_usage", null, ContentValues().apply {
             put("kyber_id", kyberPreKeyId); put("signed_id", signedPreKeyId); put("base_key", MessageDigest.getInstance("SHA-256").digest(baseKey.serialize()))
         }, SQLiteDatabase.CONFLICT_IGNORE)
-        if (inserted == -1L) throw ReusedBaseKeyException("Kyber last-resort pre-key tuple was reused")
+        if (inserted == -1L) throw ReusedBaseKeyException("Kyber pre-key tuple was reused")
+        // The enrollment Kyber key is the explicit last-resort key; one-time Kyber keys are deleted after use.
+        if (kyberPreKeyId != keys.kyberPreKeyRecord().id) removeKyberPreKey(kyberPreKeyId)
     }
 
     override fun storeSenderKey(sender: SignalProtocolAddress, distributionId: UUID, record: SenderKeyRecord) {
@@ -121,3 +149,8 @@ class PersistentSignalProtocolStore(context: Context, private val keys: DeviceKe
         val result = mutableListOf<ByteArray>(); readableDatabase.query(table, arrayOf("record"), null, null, null, null, "id").use { while (it.moveToNext()) result += cipher.decrypt(it.getBlob(0)) }; return result
     }
 }
+
+data class OneTimePreKeyBatch(
+    val ec: List<PreKeyRecord>,
+    val kyber: List<KyberPreKeyRecord>
+)

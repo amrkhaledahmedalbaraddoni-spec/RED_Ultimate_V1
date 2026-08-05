@@ -17,6 +17,8 @@ import java.util.Base64
     val deviceId: String,
     val registrationId: Int,
     val protocolDeviceId: Int,
+    val oneTimePreKeyId: Int? = null,
+    val oneTimePreKey: String? = null,
     val signedPreKeyId: Int,
     val kyberPreKeyId: Int,
     val identityKey: String,
@@ -33,18 +35,40 @@ class IdentityDirectoryApi(private val client: AuthorizedApiClient) {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun get(redId: String): ApiResult<IdentityDirectory> {
-        val authorityResult = client.request("GET", "/api/identity/authority")
+        val authorityResult = authority()
         if (authorityResult is ApiResult.Error) return authorityResult
         val directoryResult = client.request("GET", "/api/identity/directory/$redId")
         if (directoryResult is ApiResult.Error) return directoryResult
         return runCatching {
-            val authority = json.decodeFromString<AuthorityKey>((authorityResult as ApiResult.Success).value)
-            require(authority.algorithm == "ECDSA_P256_SHA256" && authority.version == "v1")
+            val authority = (authorityResult as ApiResult.Success).value
             val directory = json.decodeFromString<IdentityDirectory>((directoryResult as ApiResult.Success).value)
             require(directory.redId == redId)
             directory.devices.forEach { verify(authority, directory.redId, it) }
             ApiResult.Success(directoryResult.code, directory)
         }.getOrElse { ApiResult.Error(498, "IDENTITY_CERTIFICATE_INVALID") }
+    }
+
+    suspend fun consumePreKey(redId: String, deviceId: String): ApiResult<RemotePreKeyDevice> {
+        val authorityResult = authority()
+        if (authorityResult is ApiResult.Error) return authorityResult
+        val result = client.request("GET", "/api/identity/directory/$redId/$deviceId/prekey")
+        if (result is ApiResult.Error) return result
+        return runCatching {
+            val device = json.decodeFromString<RemotePreKeyDevice>((result as ApiResult.Success).value)
+            require(device.deviceId == deviceId)
+            verify((authorityResult as ApiResult.Success).value, redId, device)
+            ApiResult.Success(result.code, device)
+        }.getOrElse { ApiResult.Error(498, "IDENTITY_CERTIFICATE_INVALID") }
+    }
+
+    private suspend fun authority(): ApiResult<AuthorityKey> {
+        val result = client.request("GET", "/api/identity/authority")
+        if (result is ApiResult.Error) return result
+        return runCatching {
+            val authority = json.decodeFromString<AuthorityKey>((result as ApiResult.Success).value)
+            require(authority.algorithm == "ECDSA_P256_SHA256" && authority.version == "v1")
+            ApiResult.Success(result.code, authority)
+        }.getOrElse { ApiResult.Error(498, "IDENTITY_AUTHORITY_INVALID") }
     }
 
     private fun verify(authority: AuthorityKey, redId: String, device: RemotePreKeyDevice) {

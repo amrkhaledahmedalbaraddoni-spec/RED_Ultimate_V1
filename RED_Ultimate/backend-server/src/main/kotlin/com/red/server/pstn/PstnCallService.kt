@@ -28,7 +28,10 @@ class PstnCallService(
         val key = "red:pstn:daily:${user.id}:$day"
         val used = redis.opsForValue().increment(key) ?: 1L
         if (used == 1L) redis.expire(key, Duration.ofDays(2))
-        require(used <= user.pstnDailyLimit) { "Daily PSTN call limit reached" }
+        if (used > user.pstnDailyLimit) {
+            redis.opsForValue().decrement(key)
+            throw IllegalArgumentException("Daily PSTN call limit reached")
+        }
 
         return runCatching {
             val actionId = pstn.dialGsm(number)

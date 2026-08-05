@@ -19,6 +19,35 @@ RUN chmod +x gradlew \
     && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 
+FROM node:22-alpine AS admin-builder
+WORKDIR /build/admin
+COPY RED_Ultimate/admin_dashboard/package.json RED_Ultimate/admin_dashboard/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY RED_Ultimate/admin_dashboard/ ./
+RUN npm run build
+
+FROM node:22-bookworm AS sfu-check
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build/sfu
+COPY RED_Ultimate/media-sfu/package.json RED_Ultimate/media-sfu/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+COPY RED_Ultimate/media-sfu/server.js ./
+RUN npm run check && touch /tmp/red-sfu-check-ok
+
+FROM andrius/asterisk AS pstn-check
+COPY RED_Ultimate/pstn-asterisk/extensions.conf /etc/asterisk/extensions.conf
+COPY RED_Ultimate/pstn-asterisk/docker-entrypoint.sh /usr/local/bin/red-asterisk-entrypoint
+RUN chmod 0755 /usr/local/bin/red-asterisk-entrypoint \
+    && AMI_PASSWORD=Ci_safe-secret DINSTAR_IP=192.168.11.1 \
+       ASTERISK_CONFIG_DIR=/tmp/red-asterisk RED_ASTERISK_CONFIG_ONLY=1 \
+       /usr/local/bin/red-asterisk-entrypoint \
+    && grep -q 'secret = Ci_safe-secret' /tmp/red-asterisk/manager.conf \
+    && grep -q 'contact=sip:192.168.11.1:5060' /tmp/red-asterisk/pjsip.conf \
+    && ! grep -q 'webrtc-client' /tmp/red-asterisk/pjsip.conf \
+    && touch /tmp/red-pstn-check-ok
+
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 RUN apt-get update \
@@ -26,6 +55,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /build/backend-server/build/libs/*.jar app.jar
 COPY --from=android-builder /build/RED_Ultimate/red-app/build/outputs/apk/debug/*.apk /opt/red-app-debug.apk
+COPY --from=admin-builder /build/admin/dist /opt/red-admin-dashboard
+COPY --from=sfu-check /tmp/red-sfu-check-ok /opt/verification/red-sfu-check-ok
+COPY --from=pstn-check /tmp/red-pstn-check-ok /opt/verification/red-pstn-check-ok
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:8080/health || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

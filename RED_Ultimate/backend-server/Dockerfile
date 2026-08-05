@@ -5,7 +5,7 @@ WORKDIR /build
 COPY backend-server/ backend-server/
 COPY shared-proto/ shared-proto/
 WORKDIR /build/backend-server
-RUN gradle build -x test --no-daemon
+RUN gradle clean bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

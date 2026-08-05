@@ -1,4 +1,4 @@
-version: '3.8'
+name: red-sovereign
 
 services:
   # 1. The Brain: RED Unified Server
@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: backend-server/Dockerfile
     container_name: red-backend
+    restart: unless-stopped
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db-postgres:5432/red_sovereign
       - SPRING_DATASOURCE_USERNAME=admin
@@ -14,6 +15,7 @@ services:
       - SPRING_DATA_MONGODB_URI=mongodb://red_user:${MONGO_PASSWORD:?MONGO_PASSWORD is required}@db-mongo:27017/red_sovereign?authSource=admin
       - SPRING_DATA_REDIS_HOST=cache-redis
       - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - ASTERISK_AMI_HOST=pstn-gateway
       - ASTERISK_AMI_USER=red_admin
       - ASTERISK_AMI_PASSWORD=${AMI_PASSWORD:?AMI_PASSWORD is required}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
@@ -55,28 +57,48 @@ services:
   coturn:
     image: coturn/coturn
     container_name: red-turn
-    ports: ["3478:3478", "3478:3478/udp"]
-    environment:
-      - REALM=red.sovereign
-      - SECRET=${TURN_SECRET:?TURN_SECRET is required}
+    restart: unless-stopped
+    command:
+      - --no-cli
+      - --log-file=stdout
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:?TURN_SECRET is required}
+      - --realm=red.sovereign
+      - --min-port=49160
+      - --max-port=49200
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"
     networks: ["red-net"]
 
   # 4. PSTN Gateway: Asterisk PBX
   pstn-gateway:
-    image: andrius/asterisk
+    build: ./pstn-asterisk
     container_name: red-pstn-gateway
-    volumes: ["./pstn-asterisk:/etc/asterisk"]
-    ports: ["5060:5060/udp", "5038:5038"]
+    restart: unless-stopped
+    environment:
+      - AMI_PASSWORD=${AMI_PASSWORD:?AMI_PASSWORD is required}
+      - DINSTAR_IP=${DINSTAR_IP:-192.168.11.1}
+    ports:
+      - "5060:5060/udp"
+      - "10000-10100:10000-10100/udp"
+    expose:
+      - "5038"
     networks: ["red-net"]
 
   # 5. Database: PostgreSQL 16
   db-postgres:
     image: postgres:16
     container_name: red-db-sql
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=red_sovereign
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "admin"]
       interval: 10s
@@ -86,6 +108,7 @@ services:
   db-mongo:
     image: mongo:8
     container_name: red-db-nosql
+    restart: unless-stopped
     environment:
       - MONGO_INITDB_ROOT_USERNAME=red_user
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:?MONGO_PASSWORD is required}
@@ -98,10 +121,13 @@ services:
   # 7. Cache: Redis 7
   cache-redis:
     image: redis:7
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     container_name: red-cache
+    restart: unless-stopped
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping"]
       interval: 10s
@@ -111,6 +137,7 @@ services:
   minio:
     image: minio/minio
     container_name: red-storage
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     ports: ["9000:9000", "9001:9001"]
     environment:
@@ -139,7 +166,9 @@ services:
     networks: ["red-net"]
 
 volumes:
+  postgres-data:
   mongo-data:
+  redis-data:
   minio-data:
 
 networks:

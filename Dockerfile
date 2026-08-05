@@ -41,7 +41,10 @@ FROM andrius/asterisk AS pstn-check
 COPY RED_Ultimate/pstn-asterisk/extensions.conf /etc/asterisk/extensions.conf
 COPY RED_Ultimate/pstn-asterisk/docker-entrypoint.sh /usr/local/bin/red-asterisk-entrypoint
 COPY RED_Ultimate/scripts/local-first-run.sh /tmp/local-first-run.sh
-RUN sh -n /tmp/local-first-run.sh \
+# Normalize shell files defensively because Windows worktrees may already contain CRLF
+# before .gitattributes is applied.
+RUN sed -i 's/\r$//' /tmp/local-first-run.sh /usr/local/bin/red-asterisk-entrypoint /etc/asterisk/extensions.conf \
+    && sh -n /tmp/local-first-run.sh \
     && chmod 0755 /usr/local/bin/red-asterisk-entrypoint \
     && AMI_PASSWORD=Ci_safe-secret DINSTAR_IP=192.168.11.1 \
        ASTERISK_CONFIG_DIR=/tmp/red-asterisk RED_ASTERISK_CONFIG_ONLY=1 \

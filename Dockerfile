@@ -18,10 +18,8 @@ COPY RED_Ultimate/shared-proto/ shared-proto/
 RUN chmod +x gradlew \
     && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --write-verification-metadata sha256 --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
-RUN echo '=== RED_GENERATED_VERIFICATION_COMPONENTS_BASE64 ===' \
-    && grep -A8 -E '<component group="(com.google.dagger|org.jetbrains.kotlin|org.slf4j)" name="(hilt-android-gradle-plugin|kotlin-serialization|slf4j-api)" version="(2.52|2.2.21|1.7.30)"' gradle/verification-metadata.xml \
-    | base64 -w0 \
-    && echo
+RUN echo '=== RED_GENERATED_VERIFICATION_CHECKSUMS ===' \
+    && awk '/<component / { component=$0; wanted=($0 ~ /hilt-android-gradle-plugin.*2.52/ || $0 ~ /kotlin-serialization.*2.2.21/ || $0 ~ /slf4j-api.*1.7.30/) } wanted && /<artifact / { artifact=$0 } wanted && /<sha256 / { print "VERIFY|" component "|" artifact "|" $0 }' gradle/verification-metadata.xml
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

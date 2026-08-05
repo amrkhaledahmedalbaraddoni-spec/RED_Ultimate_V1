@@ -52,7 +52,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         state = AuthState.Submitting
         val enrollment = runCatching { withContext(Dispatchers.Default) { keys.enrollment() } }
             .getOrElse { state = AuthState.Error("تعذر إنشاء مفاتيح التشفير المحلية"); return@launch }
-        when (val result = api.register(RegisterRequest(username.trim(), password, displayName.trim(), enrollment))) {
+        when (val result = withServerDiscoveryRetry { api.register(RegisterRequest(username.trim(), password, displayName.trim(), enrollment)) }) {
             is ApiResult.Success -> {
                 result.value.deviceId?.let(tokens::rememberDevice)
                 pendingCredentials = username.trim() to password
@@ -64,7 +64,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun login(username: String, password: String) = viewModelScope.launch {
         state = AuthState.Submitting
-        when (val result = api.login(LoginRequest(username.trim(), password, tokens.deviceId))) {
+        when (val result = withServerDiscoveryRetry { api.login(LoginRequest(username.trim(), password, tokens.deviceId)) }) {
             is ApiResult.Error -> state = AuthState.Error(localize(result.message))
             is ApiResult.Success -> applyAuth(result.value, username, password)
         }
@@ -78,7 +78,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun recover(redId: String, code: String, newPassword: String) = viewModelScope.launch {
         state = AuthState.Submitting
-        state = when (val result = api.recover(PasswordRecoveryRequest(redId.trim(), code.trim(), newPassword))) {
+        state = when (val result = withServerDiscoveryRetry { api.recover(PasswordRecoveryRequest(redId.trim(), code.trim(), newPassword)) }) {
             is ApiResult.Success -> AuthState.RecoveryComplete
             is ApiResult.Error -> AuthState.Error(localize(result.message))
         }
@@ -103,7 +103,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private fun restore() = viewModelScope.launch {
         val refresh = tokens.refreshToken
         if (refresh == null) { state = AuthState.Welcome; return@launch }
-        when (val result = api.refresh(refresh)) {
+        when (val result = withServerDiscoveryRetry { api.refresh(refresh) }) {
             is ApiResult.Success -> {
                 tokens.updateTokens(result.value)
                 state = AuthState.Authenticated(tokens.redId.orEmpty(), tokens.username.orEmpty(), tokens.pstnEnabled)
@@ -127,6 +127,22 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             "SUSPENDED" -> state = AuthState.Suspended
             "BANNED" -> state = AuthState.Banned
             else -> state = AuthState.Error("حالة حساب غير معروفة")
+        }
+    }
+
+    private suspend fun <T> withServerDiscoveryRetry(request: suspend () -> ApiResult<T>): ApiResult<T> {
+        val first = request()
+        if (first !is ApiResult.Error || first.code != null) return first
+        serverState = ServerState.Discovering
+        return when (val discovered = discovery.discover()) {
+            is ApiResult.Success -> {
+                serverState = ServerState.Ready(discovered.value)
+                request()
+            }
+            is ApiResult.Error -> {
+                serverState = ServerState.Error(localize(discovered.message), ServerEndpoint.url())
+                first
+            }
         }
     }
 

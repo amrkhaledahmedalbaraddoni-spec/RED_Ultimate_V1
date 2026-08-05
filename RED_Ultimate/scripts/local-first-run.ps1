@@ -9,16 +9,35 @@ $EnvFile = Join-Path $Root ".env"
 
 if ($ServerIp -notmatch '^([0-9]{1,3}\.){3}[0-9]{1,3}$') { throw "ServerIp must be a local IPv4 address" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker Desktop is required" }
-if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) { throw "OpenSSL is required (Git for Windows includes it)" }
 & docker info *> $null
 if ($LASTEXITCODE -ne 0) { throw "Docker Desktop is not running" }
 & docker compose version *> $null
 if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required" }
 
+$DockerMemoryBytes = [double](& docker info --format '{{.MemTotal}}')
+if ($LASTEXITCODE -ne 0) { throw "Unable to read Docker memory limit" }
+$DockerMemoryGiB = $DockerMemoryBytes / 1GB
+if ($DockerMemoryGiB -lt 6) {
+    throw ("Docker has only {0:N1} GiB. RED builds Android, Kotlin, Node and local databases; allocate at least 6 GiB (8 GiB recommended), restart Docker Desktop, then retry." -f $DockerMemoryGiB)
+}
+Write-Host ("Docker memory preflight: {0:N1} GiB PASS" -f $DockerMemoryGiB)
+
 function New-Hex([int]$Bytes) {
     $buffer = New-Object byte[] $Bytes
-    [Security.Cryptography.RandomNumberGenerator]::Fill($buffer)
-    return [Convert]::ToHexString($buffer).ToLowerInvariant()
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($buffer) } finally { $rng.Dispose() }
+    return (-join ($buffer | ForEach-Object { $_.ToString("x2") }))
+}
+
+$OpenSslExe = $null
+$OpenSslCommand = Get-Command openssl -ErrorAction SilentlyContinue
+if ($OpenSslCommand) { $OpenSslExe = $OpenSslCommand.Source }
+if (-not $OpenSslExe) {
+    $OpenSslCandidates = @(
+        (Join-Path $env:ProgramFiles "Git\usr\bin\openssl.exe"),
+        (Join-Path $env:ProgramFiles "Git\mingw64\bin\openssl.exe")
+    )
+    $OpenSslExe = $OpenSslCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 
 if (-not (Test-Path $EnvFile)) {
@@ -47,10 +66,18 @@ $PrivateKey = Join-Path $Secrets "red_identity_private_key.pem"
 $PublicKey = Join-Path $Secrets "red_identity_public_key.pem"
 if (-not (Test-Path $PrivateKey)) {
     New-Item -ItemType Directory -Force $Secrets | Out-Null
-    & openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out $PrivateKey
-    if ($LASTEXITCODE -ne 0) { throw "Identity private key generation failed" }
-    & openssl pkey -in $PrivateKey -pubout -out $PublicKey
-    if ($LASTEXITCODE -ne 0) { throw "Identity public key generation failed" }
+    if ($OpenSslExe) {
+        Write-Host "Generating identity authority with local OpenSSL: $OpenSslExe"
+        & $OpenSslExe genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out $PrivateKey
+        if ($LASTEXITCODE -ne 0) { throw "Identity private key generation failed" }
+        & $OpenSslExe pkey -in $PrivateKey -pubout -out $PublicKey
+        if ($LASTEXITCODE -ne 0) { throw "Identity public key generation failed" }
+    } else {
+        Write-Host "Host OpenSSL not found; generating identity authority inside an ephemeral Alpine container."
+        & docker run --rm --volume "${Secrets}:/keys" alpine:3.20 sh -ec "apk add --no-cache openssl >/dev/null; umask 077; openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out /keys/red_identity_private_key.pem; openssl pkey -in /keys/red_identity_private_key.pem -pubout -out /keys/red_identity_public_key.pem"
+        if ($LASTEXITCODE -ne 0) { throw "Containerized identity key generation failed" }
+    }
+    if (-not (Test-Path $PrivateKey) -or -not (Test-Path $PublicKey)) { throw "Identity authority files were not created" }
     Write-Host "Created local identity authority keys; back up secrets securely."
 } else {
     Write-Host "Using existing identity authority keys (not overwritten)."

@@ -7,7 +7,8 @@
 - جهاز بذاكرة 16GB مفضلة (8GB حد أدنى، وقد يكون بناء Android بطيئًا).
 - مساحة فارغة 25GB تقريبًا لأول تنزيل للصور وAndroid SDK.
 - Docker Desktop على Windows، أو Docker Engine + Compose v2 على Linux.
-- OpenSSL.
+- تخصيص 6GiB على الأقل لـ Docker (8GiB موصى بها للبناء المتوازي وAndroid).
+- OpenSSL مطلوب على Linux/macOS؛ على Windows يبحث السكربت في Git for Windows ثم يستخدم حاوية Alpine مؤقتة تلقائيًا إن لم يجده.
 - عنوان IPv4 ثابت لجهاز الخادم في الشبكة المحلية، مثل `192.168.1.50`.
 - لا يلزم نطاق ولا TLS للتجربة داخل شبكة موثوقة فقط.
 

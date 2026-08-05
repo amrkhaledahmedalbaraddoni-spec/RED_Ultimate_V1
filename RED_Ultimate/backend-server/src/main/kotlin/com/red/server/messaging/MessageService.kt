@@ -24,9 +24,9 @@ class MessageService(
 ) {
     @PostConstruct
     fun indexes() {
-        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("uuid", Sort.Direction.ASC).unique())
-        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("receiverId", Sort.Direction.ASC).on("status", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
-        mongo.indexOps(MessageDocument::class.java).ensureIndex(Index().on("conversationId", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
+        mongo.indexOps(MessageDocument::class.java).createIndex(Index().on("uuid", Sort.Direction.ASC).unique())
+        mongo.indexOps(MessageDocument::class.java).createIndex(Index().on("receiverId", Sort.Direction.ASC).on("status", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
+        mongo.indexOps(MessageDocument::class.java).createIndex(Index().on("conversationId", Sort.Direction.ASC).on("sequenceNumber", Sort.Direction.ASC))
     }
 
     fun processIncoming(message: RedProtos.ChatMessage): MessageDocument {

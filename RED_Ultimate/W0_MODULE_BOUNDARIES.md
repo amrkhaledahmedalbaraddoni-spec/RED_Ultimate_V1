@@ -8,7 +8,7 @@ This file is the build and ownership gate for RED. A second implementation of an
 | UI identity | AQYAL Arabic design system | Signal screens are reference material, not the product identity |
 | HTTP/WebSocket backend | `backend-server/` | old `server/` and `com.developedchat` removed |
 | Admin UI | `admin_dashboard/` | old `admin-dashboard/` removed |
-| Messaging protocol | `shared-proto/red_protocol.proto` | legacy `messages.proto`, `/ws/chat`, and `/ws/red` removed |
+| Messaging protocol | `shared-proto/src/main/proto/red_protocol.proto` | legacy `messages.proto`, `/ws/chat`, and `/ws/red` removed |
 | Chat WebSocket | `/ws/master` using `RedProtos.RedRED` | no second ACK/message envelope allowed |
 | Call signaling/media | `/ws/calls` + WebRTC + `media-sfu/` | SIP must not be exposed to Android clients |
 | Yemeni PSTN | `pstn-asterisk/` → DINSTAR | voice only unless verified hardware evidence proves otherwise |

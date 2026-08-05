@@ -12,15 +12,6 @@ dependencies {
     api("com.google.protobuf:protobuf-java:3.25.1")
 }
 
-sourceSets {
-    main {
-        proto {
-            srcDir(project.projectDir)
-            include("*.proto")
-        }
-    }
-}
-
 protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:3.25.1"

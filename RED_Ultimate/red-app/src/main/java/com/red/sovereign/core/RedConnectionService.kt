@@ -11,7 +11,11 @@ import androidx.core.app.NotificationCompat
 import com.red.sovereign.MainActivity
 import com.red.sovereign.auth.ApiResult
 import com.red.sovereign.auth.AuthApi
+import com.red.sovereign.auth.DeviceKeyManager
 import com.red.sovereign.auth.TokenStore
+import com.red.sovereign.crypto.DecryptedMessage
+import com.red.sovereign.crypto.DecryptedMessageBus
+import com.red.sovereign.crypto.SignalSessionManager
 import com.red.sovereign.proto.RedProtos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +37,8 @@ class RedConnectionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var tokenStore: TokenStore
     private lateinit var messageStore: MessageStore
+    private lateinit var signal: SignalSessionManager
+    private lateinit var keyManager: DeviceKeyManager
     private lateinit var socket: RedWebSocketClient
 
     override fun onCreate() {

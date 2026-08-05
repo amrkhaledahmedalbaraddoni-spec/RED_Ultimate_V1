@@ -8,7 +8,7 @@ val redServerUrl = providers.gradleProperty("RED_SERVER_URL").orElse("http://192
 
 android {
     namespace = "com.red.sovereign"
-    compileSdk = 35
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "com.red.sovereign"

@@ -16,9 +16,7 @@ COPY RED_Ultimate/wire-handler/ wire-handler/
 COPY RED_Ultimate/red-app/ red-app/
 COPY RED_Ultimate/shared-proto/ shared-proto/
 RUN chmod +x gradlew \
-    && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --write-verification-metadata sha256 --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
-    && echo '=== RED_PROTOC_VERIFICATION_CHECKSUM ===' \
-    && python3 -c 'import xml.etree.ElementTree as E; r=E.parse("gradle/verification-metadata.xml").getroot(); ns={"v":"https://schema.gradle.org/dependency-verification"}; [print("VERIFY|"+c.attrib["group"]+"|"+c.attrib["name"]+"|"+c.attrib["version"]+"|"+a.attrib["name"]+"|"+s.attrib["value"]) for c in r.findall(".//v:component",ns) if (c.attrib["group"],c.attrib["name"],c.attrib["version"]) == ("com.google.protobuf","protoc","3.25.1") for a in c.findall("v:artifact",ns) for s in a.findall("v:sha256",ns)]' \
+    && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 
 FROM eclipse-temurin:21-jre-jammy

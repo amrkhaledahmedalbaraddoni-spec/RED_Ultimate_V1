@@ -147,7 +147,7 @@ gradle.projectsEvaluated {
     dependsOn("buildQa")
     dependsOn("checkStopship")
 
-    dependsOn(appTestTask)
+    appTestTask?.let { dependsOn(it) }
     appCompileInstrumentationTask?.let { dependsOn(it) }
 
     dependsOn(":fast-lint:fastLint")
@@ -172,11 +172,11 @@ gradle.projectsEvaluated {
   // If you let all of these things run in parallel, gradle will likely OOM.
   // To avoid this, we put non-app tests and lints behind the much heavier app tests and lints.
   subprojects.filter { it.name != "app" }.forEach { subproject ->
-    appTestTask.let { task ->
+    appTestTask?.let { task ->
       subproject.tasks.findByName("testDebugUnitTest")?.mustRunAfter(task)
       subproject.tasks.findByName("test")?.mustRunAfter(task)
     }
-    appLintTask.let { task ->
+    appLintTask?.let { task ->
       subproject.tasks.findByName("lintDebug")?.mustRunAfter(task)
     }
   }

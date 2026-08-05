@@ -46,9 +46,10 @@ BUILD_ANDROID=1 ./scripts/local-first-run.sh 192.168.1.50
 4. يشغّل `docker compose config --quiet`.
 5. يبني ويشغّل PostgreSQL وMongoDB وRedis وMinIO وbackend وSFU وTURN وAsterisk ولوحة الإدارة وNginx.
 6. ينتظر `/health` و`/sfu-health` بدل ادعاء نجاح مبكر.
-7. عند طلب Android، يبني الصورة ذات التحقق الصارم ويستخرج:
+7. عند طلب Android، يستخدم target خفيفًا يبني Android فقط مع التحقق الصارم ويصدر مباشرة:
    - `local-artifacts/red-app-debug.apk`
-   - `local-artifacts/app.jar`
+
+الخادم يُبنى ويُختبر ضمن Compose/CI، لذلك لا يعاد بناؤه في مرحلة استخراج APK المحلية.
 
 ## الوصول
 

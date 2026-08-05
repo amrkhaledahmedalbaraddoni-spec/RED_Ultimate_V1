@@ -24,8 +24,12 @@ RUN --mount=type=cache,target=/root/.gradle/caches,sharing=locked \
     sed -i 's/\r$//' gradlew \
     && chmod +x gradlew \
     && case "$RED_SERVER_URL" in http://*|https://*) ;; *) echo 'RED_SERVER_URL must be an absolute HTTP(S) URL' >&2; exit 64 ;; esac \
-    && sh ./gradlew :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
+    && sh ./gradlew :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" -PRED_SKIP_BUILD_LOGIC=true --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
+
+# Lightweight local export target: builds only Android and writes the APK directly to --output.
+FROM scratch AS android-artifact
+COPY --from=android-builder /build/RED_Ultimate/red-app/build/outputs/apk/debug/*.apk /red-app-debug.apk
 
 FROM node:22-alpine AS admin-builder
 WORKDIR /build/admin

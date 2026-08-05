@@ -178,16 +178,12 @@ try {
 if ($BuildAndroid) {
     Push-Location $RepoRoot
     try {
-        & docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://${ServerIp}:$HttpPort" --tag red-local:latest .
-        if ($LASTEXITCODE -ne 0) { throw "Verified Android artifact build failed" }
-        & docker rm -f red-artifacts 2>$null | Out-Null
-        & docker create --name red-artifacts red-local:latest | Out-Null
         $Artifacts = Join-Path $RepoRoot "local-artifacts"
         New-Item -ItemType Directory -Force $Artifacts | Out-Null
-        & docker cp "red-artifacts:/app/app.jar" (Join-Path $Artifacts "app.jar")
-        & docker cp "red-artifacts:/opt/red-app-debug.apk" (Join-Path $Artifacts "red-app-debug.apk")
-        & docker rm red-artifacts | Out-Null
-        Write-Host "APK and app.jar saved under local-artifacts."
+        & docker build --file Dockerfile --target android-artifact --build-arg "RED_SERVER_URL=http://${ServerIp}:$HttpPort" --output "type=local,dest=$Artifacts" .
+        if ($LASTEXITCODE -ne 0) { throw "Verified Android artifact build failed" }
+        if (-not (Test-Path (Join-Path $Artifacts "red-app-debug.apk"))) { throw "Android build finished without an APK" }
+        Write-Host "Verified APK saved under local-artifacts/red-app-debug.apk."
     } finally { Pop-Location }
 }
 

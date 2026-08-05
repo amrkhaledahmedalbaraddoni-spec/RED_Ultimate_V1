@@ -16,8 +16,10 @@ project(":app").projectDir = file("red-app")
 // One protocol shared by Android and the backend.
 include(":shared-proto")
 
-// Root QA tasks consume these tools as a composite build.
-includeBuild("build-logic")
+// Root QA tasks consume these tools as a composite build. Artifact-only Android builds may skip
+// the heavy QA composite; the full CI image still builds and tests it through its normal stages.
+val skipBuildLogic = providers.gradleProperty("RED_SKIP_BUILD_LOGIC").orNull?.toBooleanStrictOrNull() ?: false
+if (!skipBuildLogic) includeBuild("build-logic")
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)

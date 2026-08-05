@@ -117,14 +117,12 @@ wait_container_ready red-pstn-gateway
 if [ "$BUILD_ANDROID" = "1" ]; then
   printf 'Building verified backend + Android artifact image (this downloads the Android SDK image)...\n'
   cd "$REPO_ROOT"
-  docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://$SERVER_IP:$HTTP_PORT" --tag red-local:latest .
-  docker rm -f red-artifacts >/dev/null 2>&1 || true
-  docker create --name red-artifacts red-local:latest >/dev/null
   mkdir -p "$REPO_ROOT/local-artifacts"
-  docker cp red-artifacts:/app/app.jar "$REPO_ROOT/local-artifacts/app.jar"
-  docker cp red-artifacts:/opt/red-app-debug.apk "$REPO_ROOT/local-artifacts/red-app-debug.apk"
-  docker rm red-artifacts >/dev/null
-  printf 'Artifacts saved under %s/local-artifacts\n' "$REPO_ROOT"
+  docker build --file Dockerfile --target android-artifact \
+    --build-arg "RED_SERVER_URL=http://$SERVER_IP:$HTTP_PORT" \
+    --output "type=local,dest=$REPO_ROOT/local-artifacts" .
+  [ -f "$REPO_ROOT/local-artifacts/red-app-debug.apk" ] || fail "Android build finished without an APK"
+  printf 'Verified APK saved under %s/local-artifacts/red-app-debug.apk\n' "$REPO_ROOT"
 fi
 
 printf '\nRED local first run is ready.\n'

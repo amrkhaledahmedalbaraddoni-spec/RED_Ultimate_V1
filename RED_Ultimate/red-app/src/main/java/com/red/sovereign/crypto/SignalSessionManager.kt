@@ -33,7 +33,6 @@ class SignalSessionManager(context: Context) {
         if (result.value.devices.isEmpty()) return ApiResult.Error(404, "NO_APPROVED_REMOTE_DEVICE")
         val envelopes = result.value.devices.map { device ->
             val remote = SignalProtocolAddress(remoteRedId, device.protocolDeviceId)
-            val local = localAddress()
             if (!store.containsSession(remote)) {
                 val bundle = PreKeyBundle(
                     device.registrationId, device.protocolDeviceId, PreKeyBundle.NULL_PRE_KEY_ID, null,
@@ -41,9 +40,9 @@ class SignalSessionManager(context: Context) {
                     IdentityKey(decoder.decode(device.identityKey)), device.kyberPreKeyId,
                     KEMPublicKey(decoder.decode(device.kyberPreKey)), decoder.decode(device.kyberPreKeySignature)
                 )
-                SessionBuilder(store, remote, local).process(bundle)
+                SessionBuilder(store, remote).process(bundle)
             }
-            val ciphertext = SessionCipher(store, local, remote).encrypt(plaintext)
+            val ciphertext = SessionCipher(store, remote).encrypt(plaintext)
             EncryptedEnvelope(device.protocolDeviceId, ciphertext.type, ciphertext.serialize())
         }
         return ApiResult.Success(result.code, envelopes)
@@ -51,7 +50,7 @@ class SignalSessionManager(context: Context) {
 
     fun decrypt(senderRedId: String, senderDeviceId: Int, ciphertextType: Int, ciphertext: ByteArray): ByteArray {
         val remote = SignalProtocolAddress(senderRedId, senderDeviceId)
-        val cipher = SessionCipher(store, localAddress(), remote)
+        val cipher = SessionCipher(store, remote)
         return when (ciphertextType) {
             CiphertextMessage.PREKEY_TYPE -> cipher.decrypt(PreKeySignalMessage(ciphertext))
             CiphertextMessage.WHISPER_TYPE -> cipher.decrypt(SignalMessage(ciphertext))
@@ -67,7 +66,6 @@ class SignalSessionManager(context: Context) {
         return digits.chunked(5).joinToString(" ")
     }
 
-    private fun localAddress() = SignalProtocolAddress(requireNotNull(tokens.redId), keys.protocolDeviceId())
 }
 
 data class EncryptedEnvelope(val receiverDeviceId: Int, val ciphertextType: Int, val bytes: ByteArray)

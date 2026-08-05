@@ -22,7 +22,7 @@ import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import java.security.MessageDigest
 import java.util.UUID
 
-/** Durable libsignal 0.99.1 store. All records contain cryptographic state, never plaintext messages. */
+/** Durable libsignal 0.86.5 store. All records contain cryptographic state, never plaintext messages. */
 class PersistentSignalProtocolStore(context: Context, private val keys: DeviceKeyManager = DeviceKeyManager(context)) :
     SQLiteOpenHelper(context, "red_signal_protocol.db", null, 1), SignalProtocolStore {
     private val cipher = ProtocolRecordCipher()

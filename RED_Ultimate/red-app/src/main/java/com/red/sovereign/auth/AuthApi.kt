@@ -1,6 +1,6 @@
 package com.red.sovereign.auth
 
-import com.red.sovereign.BuildConfig
+import com.red.sovereign.core.ServerEndpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -29,7 +29,7 @@ class AuthApi(
 
     suspend fun recover(request: PasswordRecoveryRequest): ApiResult<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val http = Request.Builder().url(BuildConfig.RED_SERVER_URL.trimEnd('/') + "/api/auth/recover")
+            val http = Request.Builder().url(ServerEndpoint.url() + "/api/auth/recover")
                 .post(json.encodeToString(request).toRequestBody(JSON)).header("Accept", "application/json").build()
             client.newCall(http).execute().use { response ->
                 if (response.isSuccessful) ApiResult.Success(response.code, Unit)
@@ -44,7 +44,7 @@ class AuthApi(
     private suspend fun <T> post(path: String, body: String, decode: (String) -> T): ApiResult<T> = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder()
-                .url(BuildConfig.RED_SERVER_URL.trimEnd('/') + path)
+                .url(ServerEndpoint.url() + path)
                 .post(body.toRequestBody(JSON))
                 .header("Accept", "application/json")
                 .build()

@@ -1,6 +1,6 @@
 package com.red.sovereign.auth
 
-import com.red.sovereign.BuildConfig
+import com.red.sovereign.core.ServerEndpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -46,7 +46,7 @@ class AuthorizedApiClient(
     private suspend fun execute(method: String, path: String, body: RequestBody?): ApiResult<String> = withContext(Dispatchers.IO) {
         val token = tokens.accessToken ?: return@withContext ApiResult.Error(401, "UNAUTHORIZED")
         runCatching {
-            val builder = Request.Builder().url(BuildConfig.RED_SERVER_URL.trimEnd('/') + path)
+            val builder = Request.Builder().url(ServerEndpoint.url() + path)
                 .header("Authorization", "Bearer $token").header("Accept", "application/json")
             when (method) {
                 "GET" -> builder.get()
@@ -67,7 +67,7 @@ class AuthorizedApiClient(
         val token = tokens.accessToken ?: return@withContext ApiResult.Error(401, "UNAUTHORIZED")
         runCatching {
             val request = Request.Builder()
-                .url(BuildConfig.RED_SERVER_URL.trimEnd('/') + path)
+                .url(ServerEndpoint.url() + path)
                 .header("Authorization", "Bearer $token")
                 .get()
                 .build()

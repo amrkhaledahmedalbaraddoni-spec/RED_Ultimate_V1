@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.red.sovereign.core.LocalServerDiscovery
+import com.red.sovereign.core.ServerEndpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -15,6 +17,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val tokens = TokenStore(application)
     private val keys = DeviceKeyManager(application)
     private val pstn = PstnApi(tokens)
+    private val discovery = LocalServerDiscovery(application)
+
+    var serverState: ServerState by mutableStateOf(ServerState.Ready(ServerEndpoint.url()))
+        private set
 
     var pstnState: PstnState by mutableStateOf(PstnState.Idle)
         private set
@@ -23,7 +29,19 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         private set
     private var pendingCredentials: Pair<String, String>? = null
 
-    init { restore() }
+    init {
+        ServerEndpoint.initialize(application)
+        serverState = ServerState.Ready(ServerEndpoint.url())
+        restore()
+    }
+
+    fun discoverServer() = viewModelScope.launch {
+        serverState = ServerState.Discovering
+        serverState = when (val result = discovery.discover()) {
+            is ApiResult.Success -> ServerState.Ready(result.value)
+            is ApiResult.Error -> ServerState.Error(localize(result.message), ServerEndpoint.url())
+        }
+    }
 
     fun showRegister() { state = AuthState.Register }
     fun showLogin() { state = AuthState.Login }
@@ -117,6 +135,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         "NETWORK_ERROR" -> "تعذر الاتصال بخادم RED المحلي"
         "INVALID_RECOVERY_CODE" -> "RED ID أو رمز الاستعادة غير صحيح"
         "RATE_LIMITED" -> "محاولات كثيرة؛ انتظر قليلاً ثم أعد المحاولة"
+        "RED_SERVER_NOT_FOUND_ON_LAN" -> "لم يُعثر على خادم RED موثوق في الشبكة المحلية"
+        "LAN_DISCOVERY_DISABLED_IN_RELEASE" -> "الاكتشاف التلقائي متاح للنسخة المحلية فقط"
         else -> value
     }
 }
@@ -135,6 +155,12 @@ sealed interface AuthState {
     data object Suspended : AuthState
     data object Banned : AuthState
     data class Error(val message: String) : AuthState
+}
+
+sealed interface ServerState {
+    data object Discovering : ServerState
+    data class Ready(val url: String) : ServerState
+    data class Error(val message: String, val fallbackUrl: String) : ServerState
 }
 
 sealed interface PstnState {

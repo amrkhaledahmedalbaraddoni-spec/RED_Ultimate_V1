@@ -1,7 +1,6 @@
 package com.red.sovereign.core
 
 import com.google.protobuf.ByteString
-import com.red.sovereign.BuildConfig
 import com.red.sovereign.auth.TokenStore
 import com.red.sovereign.crypto.EncryptedEnvelope
 import com.red.sovereign.proto.RedProtos
@@ -23,7 +22,7 @@ class RedWebSocketClient(
 
     fun connect() {
         val token = tokens.accessToken ?: return onState(ConnectionState.UNAUTHORIZED)
-        val wsBase = BuildConfig.RED_SERVER_URL.replaceFirst("http://", "ws://").replaceFirst("https://", "wss://")
+        val wsBase = ServerEndpoint.url().replaceFirst("http://", "ws://").replaceFirst("https://", "wss://")
         val request = Request.Builder().url(wsBase.trimEnd('/') + "/ws/master")
             .header("Authorization", "Bearer $token").build()
         onState(ConnectionState.CONNECTING)

@@ -1,10 +1,13 @@
+# syntax=docker/dockerfile:1.7
 # Root CI image: compile and test the canonical RED backend with the shared protocol.
 FROM gradle:8.12-jdk21 AS builder
 WORKDIR /build
 COPY RED_Ultimate/backend-server/ backend-server/
 COPY RED_Ultimate/shared-proto/ shared-proto/
 WORKDIR /build/backend-server
-RUN gradle clean build --no-daemon > /tmp/gradle-build.log 2>&1 \
+RUN --mount=type=cache,target=/home/gradle/.gradle/caches,sharing=locked \
+    --mount=type=cache,target=/home/gradle/.gradle/wrapper,sharing=locked \
+    gradle clean build --no-daemon > /tmp/gradle-build.log 2>&1 \
     || (echo '=== RED_BACKEND_GRADLE_FAILURE ==='; tail -n 120 /tmp/gradle-build.log; exit 1)
 
 FROM ghcr.io/cirruslabs/android-sdk:35 AS android-builder
@@ -16,7 +19,11 @@ COPY RED_Ultimate/build-logic/ build-logic/
 COPY RED_Ultimate/wire-handler/ wire-handler/
 COPY RED_Ultimate/red-app/ red-app/
 COPY RED_Ultimate/shared-proto/ shared-proto/
-RUN chmod +x gradlew \
+RUN --mount=type=cache,target=/root/.gradle/caches,sharing=locked \
+    --mount=type=cache,target=/root/.gradle/wrapper,sharing=locked \
+    sed -i 's/\r$//' gradlew \
+    && chmod +x gradlew \
+    && case "$RED_SERVER_URL" in http://*|https://*) ;; *) echo 'RED_SERVER_URL must be an absolute HTTP(S) URL' >&2; exit 64 ;; esac \
     && ./gradlew :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 

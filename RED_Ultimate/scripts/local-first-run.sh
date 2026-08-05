@@ -96,7 +96,18 @@ until curl -fsS "http://127.0.0.1:$HTTP_PORT/health" >/dev/null 2>&1; do
 done
 printf ' PASS\n'
 
-curl -fsS "http://127.0.0.1:$HTTP_PORT/sfu-health" >/dev/null && printf 'SFU health: PASS\n' || fail "SFU health failed"
+printf 'Waiting for SFU'
+i=0
+until curl -fsS "http://127.0.0.1:$HTTP_PORT/sfu-health" >/dev/null 2>&1; do
+  i=$((i + 1))
+  if [ "$i" -ge 60 ]; then
+    printf '\nSFU did not become healthy. Recent logs:\n' >&2
+    docker logs --tail 100 red-media-sfu >&2 || true
+    exit 1
+  fi
+  printf '.'; sleep 3
+done
+printf ' PASS\n'
 wait_container_ready red-admin-ui
 wait_container_ready red-pstn-gateway
 

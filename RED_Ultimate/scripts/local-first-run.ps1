@@ -151,9 +151,21 @@ try {
         throw "Backend did not become healthy"
     }
     Write-Host " PASS"
-    $sfu = Invoke-WebRequest -Uri "http://127.0.0.1:$HttpPort/sfu-health" -UseBasicParsing -TimeoutSec 5
-    if ($sfu.StatusCode -ne 200) { throw "SFU health failed" }
-    Write-Host "SFU health: PASS"
+    Write-Host -NoNewline "Waiting for SFU"
+    $sfuHealthy = $false
+    foreach ($attempt in 1..60) {
+        try {
+            $sfu = Invoke-WebRequest -Uri "http://127.0.0.1:$HttpPort/sfu-health" -UseBasicParsing -TimeoutSec 3
+            if ($sfu.StatusCode -eq 200) { $sfuHealthy = $true; break }
+        } catch { }
+        Write-Host -NoNewline "."
+        Start-Sleep -Seconds 3
+    }
+    if (-not $sfuHealthy) {
+        & docker logs --tail 100 red-media-sfu
+        throw "SFU did not become healthy through Nginx"
+    }
+    Write-Host " PASS"
     Wait-ContainerReady "red-admin-ui"
     Wait-ContainerReady "red-pstn-gateway"
 } finally { Pop-Location }

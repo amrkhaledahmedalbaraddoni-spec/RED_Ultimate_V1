@@ -5,7 +5,7 @@ COPY RED_Ultimate/backend-server/ backend-server/
 COPY RED_Ultimate/shared-proto/ shared-proto/
 WORKDIR /build/backend-server
 RUN gradle clean build --no-daemon > /tmp/gradle-build.log 2>&1 \
-    || (grep -E "(^e: |^.*error: |FAILURE:|What went wrong|Could not|Execution failed|Unresolved reference)" /tmp/gradle-build.log | tail -n 160; exit 1)
+    || (echo '=== RED_BACKEND_GRADLE_FAILURE ==='; tail -n 120 /tmp/gradle-build.log; exit 1)
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

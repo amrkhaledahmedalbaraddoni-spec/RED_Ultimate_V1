@@ -25,6 +25,16 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        // libsignal-android is a large AAR. Use two HTTPS front doors for Maven Central;
+        // strict SHA-256 verification still rejects any byte not pinned in metadata.
+        maven {
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2")
+            content { includeGroup("org.signal") }
+        }
+        maven {
+            url = uri("https://repo1.maven.org/maven2")
+            content { includeGroup("org.signal") }
+        }
         mavenCentral()
     }
     versionCatalogs {

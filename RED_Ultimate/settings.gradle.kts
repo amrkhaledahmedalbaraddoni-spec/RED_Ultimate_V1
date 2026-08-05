@@ -1,3 +1,11 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = "RED-Ultimate"
 
 // Canonical RED Android product. The legacy Signal fork remains in app/ as an

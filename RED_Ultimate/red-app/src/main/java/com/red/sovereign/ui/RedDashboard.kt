@@ -221,7 +221,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
             feed.state == FeedState.Loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }
             feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض RED", (feed.state as FeedState.Error).message) }
             feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
-            else -> items(feed.posts, key = { it.id }) { PostCard(it, account.redId, feed::toggleLike, feed::follow) }
+            else -> items(feed.posts, key = { it.id }) { PostCard(it, account.redId, feed::toggleLike, feed::follow, feed::vote) }
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
@@ -246,7 +246,13 @@ private fun StoryCircle(label: String, own: Boolean, click: () -> Unit) = Column
 }
 
 @Composable
-private fun PostCard(post: Post, currentRedId: String, onLike: (Post) -> Unit, onFollow: (Post) -> Unit) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+private fun PostCard(
+    post: Post,
+    currentRedId: String,
+    onLike: (Post) -> Unit,
+    onFollow: (Post) -> Unit,
+    onVote: (Post, String) -> Unit
+) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
     Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(post.authorDisplayName.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
@@ -257,7 +263,15 @@ private fun PostCard(post: Post, currentRedId: String, onLike: (Post) -> Unit, o
             AssistChip({}, { Text(if (post.visibility == "LOCAL_YEMEN") "اليمن" else "عام") }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) })
         }
         Text(post.text, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)
-        post.poll?.let { poll -> poll.options.forEach { option -> OutlinedButton({}, Modifier.fillMaxWidth(), enabled = false) { Text("${option.text} · ${option.votes}") } } }
+        post.poll?.let { poll ->
+            val totalVotes = poll.options.sumOf { it.votes }.coerceAtLeast(1)
+            poll.options.forEach { option ->
+                val percent = (option.votes * 100 / totalVotes).toInt()
+                OutlinedButton({ onVote(post, option.id) }, Modifier.fillMaxWidth()) {
+                    Text("${option.text} · ${option.votes} ($percent%)")
+                }
+            }
+        }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
             PostAction(Icons.Default.FavoriteBorder, "${post.reactionCounts["LIKE"] ?: 0}", true) { onLike(post) }

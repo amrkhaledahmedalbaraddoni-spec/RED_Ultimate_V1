@@ -47,9 +47,21 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         // The first feed version exposes aggregate counts only. Adding a LIKE is idempotent
         // per account on the server; viewer-specific unlike state comes with the social graph.
         when (val result = api.react(post.id, "LIKE", true)) {
-            is ApiResult.Success -> posts.indexOfFirst { it.id == post.id }.takeIf { it >= 0 }?.let { posts[it] = result.value }
+            is ApiResult.Success -> replace(result.value)
             is ApiResult.Error -> state = FeedState.Error(result.message)
         }
+    }
+
+    fun vote(post: Post, optionId: String) = viewModelScope.launch {
+        when (val result = api.vote(post.id, optionId)) {
+            is ApiResult.Success -> replace(result.value)
+            is ApiResult.Error -> state = FeedState.Error(result.message)
+        }
+    }
+
+    private fun replace(post: Post) {
+        posts.indexOfFirst { it.id == post.id }.takeIf { it >= 0 }?.let { posts[it] = post }
+        state = FeedState.Ready
     }
 }
 

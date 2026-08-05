@@ -24,3 +24,4 @@ data class Post(
 @Serializable data class FeedResponse(val posts: List<Post>, val nextCursor: String? = null)
 @Serializable data class CreatePostRequest(val text: String, val visibility: String = "LOCAL_YEMEN", val parentId: String? = null, val quotePostId: String? = null, val pollOptions: List<String> = emptyList(), val pollDurationHours: Int? = null)
 @Serializable data class ReactionRequest(val type: String, val active: Boolean)
+@Serializable data class PollVoteRequest(val optionId: String)

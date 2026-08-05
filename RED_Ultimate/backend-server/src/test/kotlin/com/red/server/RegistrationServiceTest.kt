@@ -3,6 +3,7 @@ package com.red.server
 import com.red.server.auth.DeviceEnrollmentRequest
 import com.red.server.auth.DeviceEnrollmentService
 import com.red.server.auth.RedIdGenerator
+import com.red.server.auth.RecoveryService
 import com.red.server.auth.RefreshTokenService
 import com.red.server.auth.RegisterRequest
 import com.red.server.auth.RegistrationService

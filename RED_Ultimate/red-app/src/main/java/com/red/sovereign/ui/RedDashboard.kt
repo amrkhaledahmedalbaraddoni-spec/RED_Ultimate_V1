@@ -2,6 +2,7 @@ package com.red.sovereign.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,6 +83,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +106,7 @@ import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
 import com.red.sovereign.stories.Story
 import com.red.sovereign.stories.StoryState
+import com.red.sovereign.stories.StoryViewerState
 import com.red.sovereign.stories.StoryViewModel
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
@@ -190,13 +193,12 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
 @Composable
 private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, stories: StoryViewModel, onCreate: () -> Unit) {
     var filter by remember { mutableIntStateOf(0) }
-    var selectedStory by remember { mutableStateOf<Story?>(null) }
     val storyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             LazyRow(Modifier.padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { StoryCircle(if (stories.state == StoryState.Uploading) "يرفع…" else "قصتك", true) { storyPicker.launch(arrayOf("image/*", "video/*")) } }
-                items(stories.stories, key = Story::id) { story -> StoryCircle(story.ownerDisplayName, false) { stories.viewed(story); selectedStory = story } }
+                items(stories.stories, key = Story::id) { story -> StoryCircle(story.ownerDisplayName, false) { stories.open(story) } }
             }
         }
         item {
@@ -225,12 +227,32 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
-    selectedStory?.let { story ->
+    val viewer = stories.viewer
+    if (viewer !is StoryViewerState.Closed) {
+        val story = when (viewer) {
+            is StoryViewerState.Loading -> viewer.story
+            is StoryViewerState.Image -> viewer.story
+            is StoryViewerState.Unsupported -> viewer.story
+            is StoryViewerState.Error -> viewer.story
+            StoryViewerState.Closed -> error("unreachable")
+        }
         AlertDialog(
-            onDismissRequest = { selectedStory = null },
+            onDismissRequest = stories::closeViewer,
             title = { Text(story.ownerDisplayName) },
-            text = { Text("${story.caption.orEmpty()}\n${story.mediaType}\nالمشاهدات: ${story.viewCount}\nعارض الصور والفيديو الآمن قيد ربط renderer محلي.") },
-            confirmButton = { Button({ selectedStory = null }) { Text("إغلاق") } }
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    when (viewer) {
+                        is StoryViewerState.Loading -> Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) }
+                        is StoryViewerState.Image -> Image(viewer.image, story.caption ?: "حالة RED", Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Fit)
+                        is StoryViewerState.Unsupported -> Text(viewer.message, color = Color.Gray)
+                        is StoryViewerState.Error -> Text("تعذر عرض الحالة: ${viewer.message}", color = MaterialTheme.colorScheme.error)
+                        StoryViewerState.Closed -> Unit
+                    }
+                    if (!story.caption.isNullOrBlank()) Text(story.caption)
+                    Text("المشاهدات: ${story.viewCount}", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            confirmButton = { Button(stories::closeViewer) { Text("إغلاق") } }
         )
     }
 }

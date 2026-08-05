@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
 
 class AuthorizedApiClient(
     private val tokens: TokenStore,
@@ -23,6 +24,19 @@ class AuthorizedApiClient(
             val refresh = tokens.refreshToken ?: return result
             when (val rotated = auth.refresh(refresh)) {
                 is ApiResult.Success -> { tokens.updateTokens(rotated.value); result = execute(method, path, body) }
+                is ApiResult.Error -> return rotated
+            }
+        }
+        return result
+    }
+
+    suspend fun requestBytes(path: String, maximumBytes: Int = 25 * 1024 * 1024): ApiResult<ByteArray> {
+        require(maximumBytes in 1..100 * 1024 * 1024)
+        var result = executeBytes(path, maximumBytes)
+        if (result is ApiResult.Error && result.code == 401) {
+            val refresh = tokens.refreshToken ?: return result
+            when (val rotated = auth.refresh(refresh)) {
+                is ApiResult.Success -> { tokens.updateTokens(rotated.value); result = executeBytes(path, maximumBytes) }
                 is ApiResult.Error -> return rotated
             }
         }
@@ -45,6 +59,37 @@ class AuthorizedApiClient(
                 val text = response.body.string()
                 if (response.isSuccessful) ApiResult.Success(response.code, text)
                 else ApiResult.Error(response.code, text.ifBlank { "HTTP_${response.code}" })
+            }
+        }.getOrElse { ApiResult.Error(null, it.message ?: "NETWORK_ERROR") }
+    }
+
+    private suspend fun executeBytes(path: String, maximumBytes: Int): ApiResult<ByteArray> = withContext(Dispatchers.IO) {
+        val token = tokens.accessToken ?: return@withContext ApiResult.Error(401, "UNAUTHORIZED")
+        runCatching {
+            val request = Request.Builder()
+                .url(BuildConfig.RED_SERVER_URL.trimEnd('/') + path)
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use ApiResult.Error(response.code, "HTTP_${response.code}")
+                val declared = response.body.contentLength()
+                if (declared > maximumBytes) return@use ApiResult.Error(413, "MEDIA_TOO_LARGE")
+                val output = ByteArrayOutputStream(minOf(maximumBytes, if (declared > 0) declared.toInt() else 64 * 1024))
+                var tooLarge = false
+                response.body.byteStream().use { input ->
+                    val buffer = ByteArray(32 * 1024)
+                    var total = 0
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        if (total > maximumBytes) { tooLarge = true; break }
+                        output.write(buffer, 0, read)
+                    }
+                }
+                if (tooLarge) ApiResult.Error(413, "MEDIA_TOO_LARGE")
+                else ApiResult.Success(response.code, output.toByteArray())
             }
         }.getOrElse { ApiResult.Error(null, it.message ?: "NETWORK_ERROR") }
     }

@@ -18,6 +18,11 @@ import okio.source
 class MediaApi(private val context: Context, private val client: AuthorizedApiClient) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    suspend fun download(path: String, maximumBytes: Int = 25 * 1024 * 1024): ApiResult<ByteArray> {
+        require(path.startsWith("/api/media/") && !path.contains("..")) { "Invalid authenticated media path" }
+        return client.requestBytes(path, maximumBytes)
+    }
+
     suspend fun upload(uri: Uri): ApiResult<MediaObject> {
         val resolver = context.contentResolver
         val mime = resolver.getType(uri) ?: return ApiResult.Error(null, "UNKNOWN_MEDIA_TYPE")

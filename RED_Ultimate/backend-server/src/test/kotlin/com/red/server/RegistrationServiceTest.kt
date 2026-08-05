@@ -17,32 +17,32 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.util.Base64
 
 class RegistrationServiceTest {
-    private val users = mock(UserAccountRepository::class.java)
-    private val devices = mock(UserDeviceRepository::class.java)
-    private val encoder = mock(PasswordEncoder::class.java)
-    private val redIds = mock(RedIdGenerator::class.java)
-    private val enrollment = mock(DeviceEnrollmentService::class.java)
-    private val recovery = mock(RecoveryService::class.java)
-    private val refresh = mock(RefreshTokenService::class.java)
-    private val jwt = mock(JwtService::class.java)
+    private val users = mock<UserAccountRepository>()
+    private val devices = mock<UserDeviceRepository>()
+    private val encoder = mock<PasswordEncoder>()
+    private val redIds = mock<RedIdGenerator>()
+    private val enrollment = mock<DeviceEnrollmentService>()
+    private val recovery = mock<RecoveryService>()
+    private val refresh = mock<RefreshTokenService>()
+    private val jwt = mock<JwtService>()
     private val service = RegistrationService(users, devices, encoder, redIds, enrollment, recovery, refresh, jwt)
 
     @Test
     fun `new account and its first device remain pending and receive no token`() {
-        `when`(users.existsByUsernameIgnoreCase("ahmed.red")).thenReturn(false)
-        `when`(redIds.next()).thenReturn("RED-7K4M-82QX")
-        `when`(encoder.encode("a-strong-password")).thenReturn("argon2-hash")
-        `when`(users.saveAndFlush(any(UserAccount::class.java))).thenAnswer { it.arguments[0] }
-        `when`(enrollment.enroll(any(UserAccount::class.java), any(DeviceEnrollmentRequest::class.java)))
+        whenever(users.existsByUsernameIgnoreCase("ahmed.red")).thenReturn(false)
+        whenever(redIds.next()).thenReturn("RED-7K4M-82QX")
+        whenever(encoder.encode("a-strong-password")).thenReturn("argon2-hash")
+        whenever(users.saveAndFlush(any<UserAccount>())).thenAnswer { it.arguments[0] }
+        whenever(enrollment.enroll(any<UserAccount>(), any<DeviceEnrollmentRequest>()))
             .thenAnswer { UserDevice(user = it.arguments[0] as UserAccount, identityFingerprint = "abc") }
-        `when`(recovery.createFor(any(UserAccount::class.java))).thenReturn(listOf("ABCD-EFGH-JKLM"))
+        whenever(recovery.createFor(any<UserAccount>())).thenReturn(listOf("ABCD-EFGH-JKLM"))
 
         val result = service.register(
             RegisterRequest("Ahmed.Red", "a-strong-password", "أحمد", deviceRequest())

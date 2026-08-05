@@ -13,7 +13,9 @@
         android:fullBackupContent="false"
         android:usesCleartextTraffic="${usesCleartext}"
         android:theme="@style/Theme.RED"
-        android:label="RED">
+        android:label="RED"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <service
             android:name=".core.RedConnectionService"
             android:exported="false"

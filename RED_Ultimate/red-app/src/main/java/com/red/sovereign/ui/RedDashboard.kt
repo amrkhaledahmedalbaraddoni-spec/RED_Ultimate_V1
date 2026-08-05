@@ -81,6 +81,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -91,6 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.red.sovereign.R
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
@@ -184,7 +186,13 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically
 ) {
-    Text("RED", fontSize = 27.sp, color = AqyalGold, fontWeight = FontWeight.Black)
+    Image(
+        painterResource(R.drawable.red_sovereign_icon_master),
+        contentDescription = "RED",
+        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)),
+        contentScale = ContentScale.Crop
+    )
+    Text(" RED", fontSize = 24.sp, color = AqyalGold, fontWeight = FontWeight.Black)
     Text("  $redId", color = AqyalCyanGlow, fontSize = 11.sp, modifier = Modifier.weight(1f), overflow = TextOverflow.Ellipsis, maxLines = 1)
     IconButton({}, enabled = false) { Icon(Icons.Default.Search, "بحث — قيد الربط") }
     IconButton(onSettings) { Icon(Icons.Default.Settings, "الإعدادات") }

@@ -1,6 +1,11 @@
 package com.red.sovereign.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -9,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
@@ -17,6 +25,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +42,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -40,10 +55,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.red.sovereign.R
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
+import com.red.sovereign.ui.theme.AqyalSurfaceNavy
+import com.red.sovereign.ui.theme.RedCrimson
 
 @Composable
 fun AuthFlow(viewModel: AuthViewModel) {
@@ -67,10 +85,12 @@ fun AuthFlow(viewModel: AuthViewModel) {
 
 @Composable
 private fun WelcomeScreen(register: () -> Unit, login: () -> Unit) = Centered {
-    Icon(Icons.Default.AdminPanelSettings, null, tint = AqyalGold, modifier = Modifier.height(90.dp))
-    Text("RED", fontSize = 42.sp, fontWeight = FontWeight.Black, color = AqyalGold)
-    Text("هوية محلية، محادثات سيادية، دون رقم هاتف", color = AqyalCyanGlow, textAlign = TextAlign.Center)
-    Spacer(Modifier.height(40.dp))
+    BrandMark(126)
+    Spacer(Modifier.height(18.dp))
+    Text("RED", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+    Text("تواصل سيادي. هوية مستقلة. دون رقم هاتف.", color = AqyalCyanGlow, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
+    Text("محادثات · نبض محلي · مكالمات RED", color = AqyalGold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    Spacer(Modifier.height(38.dp))
     Button(register, Modifier.fillMaxWidth()) { Text("إنشاء حساب جديد") }
     Spacer(Modifier.height(12.dp))
     OutlinedButton(login, Modifier.fillMaxWidth()) { Text("لدي حساب") }
@@ -149,8 +169,48 @@ private fun PendingScreen(state: AuthState.Pending, check: () -> Unit, login: ()
     Spacer(Modifier.height(20.dp)); Button(action, Modifier.fillMaxWidth()) { Text("عودة") }
 }
 
-@Composable private fun Centered(content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxSize().padding(28.dp), Arrangement.Center, Alignment.CenterHorizontally, content = content)
-@Composable private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxSize().padding(24.dp), Arrangement.spacedBy(14.dp), Alignment.CenterHorizontally) { Spacer(Modifier.height(35.dp)); Text(title, fontSize = 30.sp, fontWeight = FontWeight.Black, color = AqyalGold); content() }
+@Composable
+private fun BrandMark(size: Int) = Box(
+    Modifier.size(size.dp)
+        .background(Brush.radialGradient(listOf(RedCrimson.copy(alpha = .35f), Color.Transparent)), CircleShape)
+        .border(1.dp, AqyalGold.copy(alpha = .72f), RoundedCornerShape((size / 4).dp))
+        .padding(7.dp),
+    contentAlignment = Alignment.Center
+) {
+    Image(
+        painterResource(R.drawable.red_sovereign_icon_master),
+        contentDescription = "RED",
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((size / 5).dp)),
+        contentScale = ContentScale.Crop
+    )
+}
+
+@Composable
+private fun Centered(content: @Composable ColumnScope.() -> Unit) = Column(
+    Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 22.dp).animateContentSize(),
+    Arrangement.Center,
+    Alignment.CenterHorizontally,
+    content = content
+)
+
+@Composable
+private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Unit) = Column(
+    Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
+    Arrangement.Center,
+    Alignment.CenterHorizontally
+) {
+    BrandMark(68)
+    Spacer(Modifier.height(12.dp))
+    Text(title, style = MaterialTheme.typography.headlineMedium, color = AqyalGold)
+    Spacer(Modifier.height(16.dp))
+    Card(
+        Modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = AqyalSurfaceNavy.copy(alpha = .88f)),
+        shape = RoundedCornerShape(26.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), Arrangement.spacedBy(14.dp), content = content)
+    }
+}
 
 @Composable private fun Field(value: String, change: (String) -> Unit, label: String, keyboard: KeyboardOptions = KeyboardOptions.Default, leading: (@Composable () -> Unit)? = null) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, leadingIcon = leading, singleLine = true, keyboardOptions = keyboard)
 @Composable private fun PasswordField(value: String, change: (String) -> Unit, label: String) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, leadingIcon = { Icon(Icons.Default.Lock, null) }, singleLine = true, visualTransformation = PasswordVisualTransformation())

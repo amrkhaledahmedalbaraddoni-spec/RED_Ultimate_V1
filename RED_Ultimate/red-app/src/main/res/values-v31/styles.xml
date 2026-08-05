@@ -10,5 +10,8 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:colorAccent">@color/red_crimson</item>
         <item name="android:windowBackground">@color/red_obsidian</item>
+        <item name="android:windowSplashScreenBackground">@color/red_obsidian</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimationDuration">650</item>
     </style>
 </resources>

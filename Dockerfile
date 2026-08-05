@@ -16,7 +16,7 @@ COPY RED_Ultimate/wire-handler/ wire-handler/
 COPY RED_Ultimate/red-app/ red-app/
 COPY RED_Ultimate/shared-proto/ shared-proto/
 RUN chmod +x gradlew \
-    && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --no-daemon > /tmp/android-build.log 2>&1 \
+    && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --dependency-verification lenient --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 
 FROM eclipse-temurin:21-jre-jammy

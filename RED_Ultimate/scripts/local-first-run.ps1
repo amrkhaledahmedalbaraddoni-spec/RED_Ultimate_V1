@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$ServerIp,
+    [ValidateRange(1024, 65535)][int]$HttpPort = 8088,
     [switch]$BuildAndroid
 )
 $ErrorActionPreference = "Stop"
@@ -58,8 +59,27 @@ if (-not (Test-Path $EnvFile)) {
     [IO.File]::WriteAllText($EnvFile, $text, [Text.UTF8Encoding]::new($false))
     Write-Host "Created private RED_Ultimate/.env"
 } else {
-    Write-Host "Using existing RED_Ultimate/.env (not overwritten)."
+    Write-Host "Using existing RED_Ultimate/.env (secrets are not overwritten)."
 }
+
+# Port 80 is commonly reserved by HTTP.sys/IIS on Windows. Keep the internal Nginx port at 80,
+# but expose a configurable unprivileged host port and ensure browser CORS includes that origin.
+$envText = Get-Content $EnvFile -Raw
+if ($envText -match '(?m)^RED_HTTP_PORT=.*$') {
+    $envText = [regex]::Replace($envText, '(?m)^RED_HTTP_PORT=.*$', "RED_HTTP_PORT=$HttpPort")
+} else {
+    $envText = $envText.TrimEnd() + "`r`nRED_HTTP_PORT=$HttpPort`r`n"
+}
+$requiredOrigins = @("http://localhost:$HttpPort", "http://127.0.0.1:$HttpPort", "http://${ServerIp}:$HttpPort")
+$originMatch = [regex]::Match($envText, '(?m)^ALLOWED_ORIGINS=(.*)$')
+if ($originMatch.Success) {
+    $origins = @($originMatch.Groups[1].Value.Split(',') + $requiredOrigins | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique)
+    $envText = [regex]::Replace($envText, '(?m)^ALLOWED_ORIGINS=.*$', "ALLOWED_ORIGINS=$($origins -join ',')")
+} else {
+    $envText = $envText.TrimEnd() + "`r`nALLOWED_ORIGINS=$($requiredOrigins -join ',')`r`n"
+}
+[IO.File]::WriteAllText($EnvFile, $envText, [Text.UTF8Encoding]::new($false))
+Write-Host "Local HTTP endpoint: http://${ServerIp}:$HttpPort"
 
 $Secrets = Join-Path $Root "secrets"
 $PrivateKey = Join-Path $Secrets "red_identity_private_key.pem"
@@ -97,7 +117,7 @@ try {
     $healthy = $false
     foreach ($attempt in 1..60) {
         try {
-            $response = Invoke-WebRequest -Uri "http://127.0.0.1/health" -UseBasicParsing -TimeoutSec 3
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:$HttpPort/health" -UseBasicParsing -TimeoutSec 3
             if ($response.StatusCode -eq 200) { $healthy = $true; break }
         } catch { }
         Write-Host -NoNewline "."
@@ -109,7 +129,7 @@ try {
         throw "Backend did not become healthy"
     }
     Write-Host " PASS"
-    $sfu = Invoke-WebRequest -Uri "http://127.0.0.1/sfu-health" -UseBasicParsing -TimeoutSec 5
+    $sfu = Invoke-WebRequest -Uri "http://127.0.0.1:$HttpPort/sfu-health" -UseBasicParsing -TimeoutSec 5
     if ($sfu.StatusCode -ne 200) { throw "SFU health failed" }
     Write-Host "SFU health: PASS"
 } finally { Pop-Location }
@@ -117,7 +137,7 @@ try {
 if ($BuildAndroid) {
     Push-Location $RepoRoot
     try {
-        & docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://$ServerIp" --tag red-local:latest .
+        & docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://${ServerIp}:$HttpPort" --tag red-local:latest .
         if ($LASTEXITCODE -ne 0) { throw "Verified Android artifact build failed" }
         & docker rm -f red-artifacts 2>$null | Out-Null
         & docker create --name red-artifacts red-local:latest | Out-Null
@@ -131,6 +151,6 @@ if ($BuildAndroid) {
 }
 
 Write-Host ""
-Write-Host "RED local first run is ready: http://$ServerIp/"
-Write-Host "Health endpoint: http://$ServerIp/health"
+Write-Host "RED local first run is ready: http://${ServerIp}:$HttpPort/"
+Write-Host "Health endpoint: http://${ServerIp}:$HttpPort/health"
 Write-Host "Admin credentials remain only in RED_Ultimate/.env."

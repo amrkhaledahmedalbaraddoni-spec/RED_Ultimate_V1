@@ -53,9 +53,9 @@ BUILD_ANDROID=1 ./scripts/local-first-run.sh 192.168.1.50
 ## الوصول
 
 ```text
-لوحة الإدارة: http://IP-الخادم/
-حالة backend: http://IP-الخادم/health
-حالة SFU:     http://IP-الخادم/sfu-health
+لوحة الإدارة: http://IP-الخادم:8088/
+حالة backend: http://IP-الخادم:8088/health
+حالة SFU:     http://IP-الخادم:8088/sfu-health
 ```
 
 بيانات المسؤول موجودة محليًا فقط في:

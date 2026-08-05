@@ -6,6 +6,7 @@ REPO_ROOT="$(dirname "$ROOT")"
 ENV_FILE="$ROOT/.env"
 SERVER_IP="${1:-}"
 BUILD_ANDROID="${BUILD_ANDROID:-0}"
+HTTP_PORT="${RED_HTTP_PORT:-8088}"
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is required"; }
@@ -39,8 +40,19 @@ if [ ! -f "$ENV_FILE" ]; then
   chmod 600 "$ENV_FILE"
   printf 'Created private local configuration: %s\n' "$ENV_FILE"
 else
-  printf 'Using existing %s (not overwritten).\n' "$ENV_FILE"
+  printf 'Using existing %s (secrets are not overwritten).\n' "$ENV_FILE"
 fi
+
+case "$HTTP_PORT" in *[!0-9]*|'') fail "RED_HTTP_PORT must be numeric" ;; esac
+[ "$HTTP_PORT" -ge 1024 ] && [ "$HTTP_PORT" -le 65535 ] || fail "RED_HTTP_PORT must be between 1024 and 65535"
+existing_origins="$(sed -n 's/^ALLOWED_ORIGINS=//p' "$ENV_FILE" | tail -n 1)"
+required_origins="http://localhost:$HTTP_PORT,http://127.0.0.1:$HTTP_PORT,http://$SERVER_IP:$HTTP_PORT"
+tmp_env="$ENV_FILE.tmp"
+grep -v -E '^(RED_HTTP_PORT|ALLOWED_ORIGINS)=' "$ENV_FILE" > "$tmp_env"
+printf 'RED_HTTP_PORT=%s\nALLOWED_ORIGINS=%s%s%s\n' "$HTTP_PORT" "$existing_origins" "${existing_origins:+,}" "$required_origins" >> "$tmp_env"
+mv "$tmp_env" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+printf 'Local HTTP endpoint: http://%s:%s\n' "$SERVER_IP" "$HTTP_PORT"
 
 if [ ! -f "$ROOT/secrets/red_identity_private_key.pem" ]; then
   "$ROOT/scripts/generate-local-identity-authority.sh"
@@ -57,7 +69,7 @@ docker compose --env-file "$ENV_FILE" up -d
 
 printf 'Waiting for RED backend health'
 i=0
-until curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; do
+until curl -fsS "http://127.0.0.1:$HTTP_PORT/health" >/dev/null 2>&1; do
   i=$((i + 1))
   if [ "$i" -ge 60 ]; then
     printf '\nBackend did not become healthy. Recent logs:\n' >&2
@@ -70,12 +82,12 @@ until curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; do
 done
 printf ' PASS\n'
 
-curl -fsS "http://127.0.0.1/sfu-health" >/dev/null && printf 'SFU health: PASS\n' || fail "SFU health failed"
+curl -fsS "http://127.0.0.1:$HTTP_PORT/sfu-health" >/dev/null && printf 'SFU health: PASS\n' || fail "SFU health failed"
 
 if [ "$BUILD_ANDROID" = "1" ]; then
   printf 'Building verified backend + Android artifact image (this downloads the Android SDK image)...\n'
   cd "$REPO_ROOT"
-  docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://$SERVER_IP" --tag red-local:latest .
+  docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://$SERVER_IP:$HTTP_PORT" --tag red-local:latest .
   docker rm -f red-artifacts >/dev/null 2>&1 || true
   docker create --name red-artifacts red-local:latest >/dev/null
   mkdir -p "$REPO_ROOT/local-artifacts"
@@ -86,7 +98,7 @@ if [ "$BUILD_ANDROID" = "1" ]; then
 fi
 
 printf '\nRED local first run is ready.\n'
-printf 'Admin dashboard: http://%s/\n' "$SERVER_IP"
-printf 'Health:          http://%s/health\n' "$SERVER_IP"
+printf 'Admin dashboard: http://%s:%s/\n' "$SERVER_IP" "$HTTP_PORT"
+printf 'Health:          http://%s:%s/health\n' "$SERVER_IP" "$HTTP_PORT"
 printf 'The generated admin password remains only in RED_Ultimate/.env.\n'
 printf 'Install local-artifacts/red-app-debug.apk only when BUILD_ANDROID=1 was used.\n'

@@ -129,7 +129,9 @@ class PersistentSignalProtocolStore(context: Context, private val keys: DeviceKe
         }, SQLiteDatabase.CONFLICT_IGNORE)
         if (inserted == -1L) throw ReusedBaseKeyException("Kyber pre-key tuple was reused")
         // The enrollment Kyber key is the explicit last-resort key; one-time Kyber keys are deleted after use.
-        if (kyberPreKeyId != keys.kyberPreKeyRecord().id) removeKyberPreKey(kyberPreKeyId)
+        if (kyberPreKeyId != keys.kyberPreKeyRecord().id) {
+            writableDatabase.delete("kyber_prekeys", "id = ?", arrayOf(kyberPreKeyId.toString()))
+        }
     }
 
     override fun storeSenderKey(sender: SignalProtocolAddress, distributionId: UUID, record: SenderKeyRecord) {

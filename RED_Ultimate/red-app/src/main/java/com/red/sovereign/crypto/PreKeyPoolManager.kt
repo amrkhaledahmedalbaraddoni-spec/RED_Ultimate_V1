@@ -31,10 +31,11 @@ class PreKeyPoolManager(context: Context) {
         val deviceId = tokens.deviceId ?: return ApiResult.Error(401, "DEVICE_ID_MISSING")
         val stockResult = client.request("GET", "/api/devices/$deviceId/prekeys/stock")
         if (stockResult is ApiResult.Error) return stockResult
-        val stock = runCatching { json.decodeFromString<PreKeyStock>((stockResult as ApiResult.Success).value) }
+        val stockSuccess = stockResult as ApiResult.Success
+        val stock = runCatching { json.decodeFromString<PreKeyStock>(stockSuccess.value) }
             .getOrElse { return ApiResult.Error(null, "INVALID_PREKEY_STOCK_RESPONSE") }
         val availablePairs = minOf(stock.ecAvailable, stock.kyberAvailable)
-        if (availablePairs >= stock.minimumRecommended) return ApiResult.Success(stockResult.code, stock)
+        if (availablePairs >= stock.minimumRecommended) return ApiResult.Success(stockSuccess.code, stock)
 
         val batch = protocolStore.generateOneTimeBatch((TARGET_STOCK - availablePairs).coerceIn(1, MAX_BATCH))
         val upload = PreKeyUpload(
@@ -46,8 +47,9 @@ class PreKeyPoolManager(context: Context) {
         )
         val uploaded = client.request("POST", "/api/devices/$deviceId/prekeys", json.encodeToString(upload))
         if (uploaded is ApiResult.Error) return uploaded
+        val uploadSuccess = uploaded as ApiResult.Success
         return runCatching {
-            ApiResult.Success(uploaded.code, json.decodeFromString<PreKeyStock>((uploaded as ApiResult.Success).value))
+            ApiResult.Success(uploadSuccess.code, json.decodeFromString<PreKeyStock>(uploadSuccess.value))
         }.getOrElse { ApiResult.Error(null, "INVALID_PREKEY_UPLOAD_RESPONSE") }
     }
 

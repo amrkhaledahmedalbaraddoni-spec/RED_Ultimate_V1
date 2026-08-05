@@ -38,7 +38,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // PSTN / Asterisk
-    implementation("org.asteriskjava:asterisk-java:3.40.0")
+    implementation("org.asteriskjava:asterisk-java:3.41.0")
 
     // One authoritative RED protocol shared by Android and the backend
     implementation(project(":shared-proto"))

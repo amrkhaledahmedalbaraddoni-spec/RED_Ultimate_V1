@@ -8,6 +8,7 @@ RUN gradle clean build --no-daemon > /tmp/gradle-build.log 2>&1 \
     || (echo '=== RED_BACKEND_GRADLE_FAILURE ==='; tail -n 120 /tmp/gradle-build.log; exit 1)
 
 FROM ghcr.io/cirruslabs/android-sdk:35 AS android-builder
+ARG RED_SERVER_URL=http://127.0.0.1
 WORKDIR /build/RED_Ultimate
 COPY RED_Ultimate/build.gradle.kts RED_Ultimate/settings.gradle.kts RED_Ultimate/gradle.properties RED_Ultimate/gradlew ./
 COPY RED_Ultimate/gradle/ gradle/
@@ -16,7 +17,7 @@ COPY RED_Ultimate/wire-handler/ wire-handler/
 COPY RED_Ultimate/red-app/ red-app/
 COPY RED_Ultimate/shared-proto/ shared-proto/
 RUN chmod +x gradlew \
-    && ./gradlew :app:assembleDebug -PRED_SERVER_URL=http://127.0.0.1 --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
+    && ./gradlew :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 
 FROM node:22-alpine AS admin-builder
@@ -39,7 +40,9 @@ RUN npm run check && touch /tmp/red-sfu-check-ok
 FROM andrius/asterisk AS pstn-check
 COPY RED_Ultimate/pstn-asterisk/extensions.conf /etc/asterisk/extensions.conf
 COPY RED_Ultimate/pstn-asterisk/docker-entrypoint.sh /usr/local/bin/red-asterisk-entrypoint
-RUN chmod 0755 /usr/local/bin/red-asterisk-entrypoint \
+COPY RED_Ultimate/scripts/local-first-run.sh /tmp/local-first-run.sh
+RUN sh -n /tmp/local-first-run.sh \
+    && chmod 0755 /usr/local/bin/red-asterisk-entrypoint \
     && AMI_PASSWORD=Ci_safe-secret DINSTAR_IP=192.168.11.1 \
        ASTERISK_CONFIG_DIR=/tmp/red-asterisk RED_ASTERISK_CONFIG_ONLY=1 \
        /usr/local/bin/red-asterisk-entrypoint \

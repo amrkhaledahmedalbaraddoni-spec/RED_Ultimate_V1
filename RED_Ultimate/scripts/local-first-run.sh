@@ -1,0 +1,92 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+REPO_ROOT="$(dirname "$ROOT")"
+ENV_FILE="$ROOT/.env"
+SERVER_IP="${1:-}"
+BUILD_ANDROID="${BUILD_ANDROID:-0}"
+
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is required"; }
+
+need docker
+need openssl
+docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required (docker compose)"
+docker info >/dev/null 2>&1 || fail "Docker daemon is not running"
+
+if [ -z "$SERVER_IP" ]; then
+  SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+fi
+[ -n "$SERVER_IP" ] || fail "Pass the local server IPv4 address: ./scripts/local-first-run.sh 192.168.1.50"
+case "$SERVER_IP" in *[!0-9.]*) fail "Server IP must be an IPv4 address" ;; esac
+
+if [ ! -f "$ENV_FILE" ]; then
+  rand_hex() { openssl rand -hex "$1"; }
+  umask 077
+  sed \
+    -e "s|replace_with_a_long_random_database_password|$(rand_hex 32)|" \
+    -e "s|replace_with_a_long_random_mongodb_password|$(rand_hex 32)|" \
+    -e "s|replace_with_a_long_random_minio_password|$(rand_hex 32)|" \
+    -e "s|replace_with_a_long_random_redis_password|$(rand_hex 32)|" \
+    -e "s|replace_with_a_long_random_asterisk_password|$(rand_hex 32)|" \
+    -e "s|replace_with_a_long_random_turn_secret|$(rand_hex 32)|" \
+    -e "s|replace_with_at_least_32_random_characters|$(rand_hex 48)|" \
+    -e "s|replace_with_at_least_14_random_characters|$(rand_hex 20)|" \
+    -e "s|replace_with_the_gateway_password|$(rand_hex 24)|" \
+    -e "s|192\.168\.1\.50|$SERVER_IP|g" \
+    "$ROOT/.env.example" > "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+  printf 'Created private local configuration: %s\n' "$ENV_FILE"
+else
+  printf 'Using existing %s (not overwritten).\n' "$ENV_FILE"
+fi
+
+if [ ! -f "$ROOT/secrets/red_identity_private_key.pem" ]; then
+  "$ROOT/scripts/generate-local-identity-authority.sh"
+else
+  printf 'Using existing RED identity authority keys (not overwritten).\n'
+fi
+
+cd "$ROOT"
+docker compose --env-file "$ENV_FILE" config --quiet
+printf 'Docker Compose configuration: PASS\n'
+
+docker compose --env-file "$ENV_FILE" build
+docker compose --env-file "$ENV_FILE" up -d
+
+printf 'Waiting for RED backend health'
+i=0
+until curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; do
+  i=$((i + 1))
+  if [ "$i" -ge 60 ]; then
+    printf '\nBackend did not become healthy. Recent logs:\n' >&2
+    docker compose --env-file "$ENV_FILE" ps >&2
+    docker compose --env-file "$ENV_FILE" logs --tail=120 backend >&2
+    exit 1
+  fi
+  printf '.'
+  sleep 3
+done
+printf ' PASS\n'
+
+curl -fsS "http://127.0.0.1/sfu-health" >/dev/null && printf 'SFU health: PASS\n' || fail "SFU health failed"
+
+if [ "$BUILD_ANDROID" = "1" ]; then
+  printf 'Building verified backend + Android artifact image (this downloads the Android SDK image)...\n'
+  cd "$REPO_ROOT"
+  docker build --file Dockerfile --build-arg "RED_SERVER_URL=http://$SERVER_IP" --tag red-local:latest .
+  docker rm -f red-artifacts >/dev/null 2>&1 || true
+  docker create --name red-artifacts red-local:latest >/dev/null
+  mkdir -p "$REPO_ROOT/local-artifacts"
+  docker cp red-artifacts:/app/app.jar "$REPO_ROOT/local-artifacts/app.jar"
+  docker cp red-artifacts:/opt/red-app-debug.apk "$REPO_ROOT/local-artifacts/red-app-debug.apk"
+  docker rm red-artifacts >/dev/null
+  printf 'Artifacts saved under %s/local-artifacts\n' "$REPO_ROOT"
+fi
+
+printf '\nRED local first run is ready.\n'
+printf 'Admin dashboard: http://%s/\n' "$SERVER_IP"
+printf 'Health:          http://%s/health\n' "$SERVER_IP"
+printf 'The generated admin password remains only in RED_Ultimate/.env.\n'
+printf 'Install local-artifacts/red-app-debug.apk only when BUILD_ANDROID=1 was used.\n'

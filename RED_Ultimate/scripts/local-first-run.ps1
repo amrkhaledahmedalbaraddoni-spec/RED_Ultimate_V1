@@ -134,6 +134,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose build failed" }
     & docker compose --env-file $EnvFile up -d
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose startup failed" }
+    # Nginx resolves Docker service names when loading its config. Recreate/restart after upstream
+    # containers so cached addresses cannot point at a replaced backend or SFU container.
+    & docker compose --env-file $EnvFile restart nginx
+    if ($LASTEXITCODE -ne 0) { throw "Nginx restart after upstream startup failed" }
+    Start-Sleep -Seconds 3
 
     Write-Host -NoNewline "Waiting for backend"
     $healthy = $false

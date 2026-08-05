@@ -80,6 +80,9 @@ printf 'Docker Compose configuration: PASS\n'
 
 docker compose --env-file "$ENV_FILE" build
 docker compose --env-file "$ENV_FILE" up -d
+# Nginx resolves Docker service names at config load; refresh after upstream replacement.
+docker compose --env-file "$ENV_FILE" restart nginx
+sleep 3
 
 printf 'Waiting for RED backend health'
 i=0

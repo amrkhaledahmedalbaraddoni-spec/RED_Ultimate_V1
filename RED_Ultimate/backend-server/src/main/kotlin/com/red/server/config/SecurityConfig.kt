@@ -19,7 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 class SecurityConfig(
     private val jwtFilter: JwtAuthenticationFilter,
     @Value("\${red.security.allowed-origins:http://localhost,http://127.0.0.1}")
-    private val allowedOrigins: String
+    private val configuredAllowedOrigins: String
 ) {
     @Bean
     fun passwordEncoder(): PasswordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()
@@ -49,7 +49,7 @@ class SecurityConfig(
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration().apply {
-            allowedOriginPatterns = allowedOrigins.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            allowedOriginPatterns = configuredAllowedOrigins.split(',').map(String::trim).filter(String::isNotEmpty)
             allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
             allowedHeaders = listOf("Authorization", "Content-Type", "X-Requested-With")
             exposedHeaders = listOf("Location")

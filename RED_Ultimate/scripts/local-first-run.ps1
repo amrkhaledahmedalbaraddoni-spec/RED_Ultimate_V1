@@ -17,8 +17,8 @@ if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required" }
 $DockerMemoryBytes = [double](& docker info --format '{{.MemTotal}}')
 if ($LASTEXITCODE -ne 0) { throw "Unable to read Docker memory limit" }
 $DockerMemoryGiB = $DockerMemoryBytes / 1GB
-if ($DockerMemoryGiB -lt 6) {
-    throw ("Docker has only {0:N1} GiB. RED builds Android, Kotlin, Node and local databases; allocate at least 6 GiB (8 GiB recommended), restart Docker Desktop, then retry." -f $DockerMemoryGiB)
+if ($DockerMemoryGiB -lt 5.5) {
+    throw ("Docker has only {0:N1} GiB available. RED needs at least 5.5 GiB available after VM overhead (6 GiB configured; 8 GiB recommended), then restart Docker Desktop and retry." -f $DockerMemoryGiB)
 }
 Write-Host ("Docker memory preflight: {0:N1} GiB PASS" -f $DockerMemoryGiB)
 

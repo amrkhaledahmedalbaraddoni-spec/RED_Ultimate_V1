@@ -11,7 +11,10 @@ import com.red.sovereign.auth.ApiResult
 import com.red.sovereign.auth.AuthorizedApiClient
 import com.red.sovereign.auth.TokenStore
 import com.red.sovereign.core.RedConnectionService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 class AttachmentViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = EncryptedAttachmentRepository(application, AuthorizedApiClient(TokenStore(application)))
@@ -41,6 +44,21 @@ class AttachmentViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun exportTo(destination: Uri) = viewModelScope.launch {
+        val downloaded = state as? AttachmentState.Downloaded ?: return@launch
+        state = AttachmentState.Working("جارٍ حفظ نسخة يختارها المستخدم…")
+        state = withContext(Dispatchers.IO) {
+            runCatching {
+                val source = File(downloaded.path)
+                require(source.isFile) { "Decrypted file is unavailable" }
+                val resolver = getApplication<Application>().contentResolver
+                resolver.openOutputStream(destination, "w")?.use { output -> source.inputStream().use { it.copyTo(output, 64 * 1024) } }
+                    ?: error("Unable to open export destination")
+                AttachmentState.Exported(downloaded.path, downloaded.name)
+            }.getOrElse { AttachmentState.Error(it.message ?: "ATTACHMENT_EXPORT_FAILED") }
+        }
+    }
+
     fun clear() { state = AttachmentState.Idle }
 }
 
@@ -49,5 +67,6 @@ sealed interface AttachmentState {
     data class Working(val message: String) : AttachmentState
     data class Sent(val name: String) : AttachmentState
     data class Downloaded(val path: String, val name: String) : AttachmentState
+    data class Exported(val path: String, val name: String) : AttachmentState
     data class Error(val message: String) : AttachmentState
 }

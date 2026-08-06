@@ -37,6 +37,8 @@ class VoiceMessageViewModel(application: Application) : AndroidViewModel(applica
     private var ticker: Job? = null
     var state: VoiceMessageState by mutableStateOf(VoiceMessageState.Idle); private set
     var elapsedSeconds by mutableIntStateOf(0); private set
+    var waveform: List<Int> by mutableStateOf(emptyList()); private set
+    private var recordingPaused = false
 
     fun start(targetRedId: String, conversationId: String) {
         if (recorder != null || state is VoiceMessageState.Sending) return
@@ -61,13 +63,34 @@ class VoiceMessageViewModel(application: Application) : AndroidViewModel(applica
         recordingFile = file
         recorder = instance
         elapsedSeconds = 0
-        state = VoiceMessageState.Recording
+        waveform = emptyList()
+        recordingPaused = false
+        state = VoiceMessageState.Recording(paused = false)
         ticker = viewModelScope.launch {
-            while (isActive && recorder != null) { delay(1_000); elapsedSeconds++ }
+            var quarterSeconds = 0
+            while (isActive && recorder != null) {
+                delay(250)
+                if (!recordingPaused) {
+                    quarterSeconds++
+                    elapsedSeconds = quarterSeconds / 4
+                    val amplitude = runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
+                    val normalized = ((amplitude / 32767f) * 100).toInt().coerceIn(2, 100)
+                    waveform = (waveform + normalized).takeLast(96)
+                }
+            }
         }
     }
 
     private var pendingTarget: Triple<String, String, String>? = null
+
+    fun togglePause() {
+        val instance = recorder ?: return
+        runCatching {
+            if (recordingPaused) instance.resume() else instance.pause()
+            recordingPaused = !recordingPaused
+            state = VoiceMessageState.Recording(recordingPaused)
+        }.onFailure { state = VoiceMessageState.Error(it.message ?: "VOICE_PAUSE_FAILED") }
+    }
 
     fun stopAndSend(targetRedId: String, conversationId: String) {
         pendingTarget = Triple(targetRedId, conversationId, "VOICE")
@@ -78,11 +101,12 @@ class VoiceMessageViewModel(application: Application) : AndroidViewModel(applica
         val target = pendingTarget ?: return
         val file = recordingFile ?: return
         val duration = elapsedSeconds
+        val recordedWaveform = waveform
         releaseRecorder(deleteFile = false)
         if (duration < 1 || file.length() <= 0) { file.delete(); state = VoiceMessageState.Error("VOICE_TOO_SHORT"); return }
         viewModelScope.launch {
             state = VoiceMessageState.Sending
-            when (val result = encryptUploadAndGrant(file, target.first, duration)) {
+            when (val result = encryptUploadAndGrant(file, target.first, duration, recordedWaveform)) {
                 is ApiResult.Error -> state = VoiceMessageState.Error(result.message)
                 is ApiResult.Success -> {
                     RedConnectionService.sendPayload(
@@ -100,13 +124,15 @@ class VoiceMessageViewModel(application: Application) : AndroidViewModel(applica
     fun cancel() {
         releaseRecorder(deleteFile = true)
         pendingTarget = null
+        waveform = emptyList()
+        elapsedSeconds = 0
         state = VoiceMessageState.Idle
     }
 
     fun permissionDenied() { if (recorder == null) state = VoiceMessageState.Error("MICROPHONE_PERMISSION_REQUIRED") }
     fun clear() { if (recorder == null) state = VoiceMessageState.Idle }
 
-    private suspend fun encryptUploadAndGrant(file: File, targetRedId: String, duration: Int): ApiResult<String> {
+    private suspend fun encryptUploadAndGrant(file: File, targetRedId: String, duration: Int, waveform: List<Int>): ApiResult<String> {
         val key = ByteArray(32).also(random::nextBytes)
         val nonce = ByteArray(12).also(random::nextBytes)
         val encrypted = File.createTempFile("voice-encrypted-", ".bin", getApplication<Application>().cacheDir)
@@ -135,6 +161,7 @@ class VoiceMessageViewModel(application: Application) : AndroidViewModel(applica
                             name = "voice-${System.currentTimeMillis()}.m4a",
                             size = file.length(),
                             durationSeconds = duration,
+                            waveform = waveform.map { it.coerceIn(0, 100) }.take(96),
                             sha256 = digest.digest().joinToString("") { "%02x".format(it) },
                             key = Base64.getEncoder().encodeToString(key),
                             nonce = Base64.getEncoder().encodeToString(nonce)
@@ -173,6 +200,7 @@ data class VoiceManifest(
     val mimeType: String = "audio/mp4",
     val size: Long,
     val durationSeconds: Int,
+    val waveform: List<Int> = emptyList(),
     val sha256: String,
     val key: String,
     val nonce: String
@@ -180,7 +208,7 @@ data class VoiceManifest(
 
 sealed interface VoiceMessageState {
     data object Idle : VoiceMessageState
-    data object Recording : VoiceMessageState
+    data class Recording(val paused: Boolean) : VoiceMessageState
     data object Sending : VoiceMessageState
     data class Sent(val durationSeconds: Int) : VoiceMessageState
     data class Error(val message: String) : VoiceMessageState

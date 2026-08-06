@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +47,9 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -97,6 +100,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -129,6 +133,7 @@ import com.red.sovereign.media.AttachmentViewModel
 import com.red.sovereign.media.VoiceManifest
 import com.red.sovereign.media.VoiceMessageState
 import com.red.sovereign.media.VoiceMessageViewModel
+import com.red.sovereign.media.VoiceNotePlayer
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -416,6 +421,9 @@ private fun ChatHubScreen(
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && target.isNotBlank()) attachments.send(uri, target, conversationId(account.redId, target))
     }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) attachments.exportTo(uri)
+    }
     var showSafetyScanner by remember { mutableStateOf(false) }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         showSafetyScanner = granted
@@ -494,13 +502,21 @@ private fun ChatHubScreen(
                 is AttachmentState.Working -> Text(attachmentState.message, color = AqyalGold, style = MaterialTheme.typography.bodySmall)
                 is AttachmentState.Error -> Text("تعذر إكمال المرفق: ${attachmentState.message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 is AttachmentState.Sent -> Text("تم إرسال ${attachmentState.name} مشفرًا", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
-                is AttachmentState.Downloaded -> Text("تم التحقق وفك التشفير: ${attachmentState.name}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
+                is AttachmentState.Downloaded -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("تم التحقق وفك التشفير: ${attachmentState.name}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton({ exportPicker.launch(attachmentState.name) }) { Text("حفظ نسخة") }
+                }
+                is AttachmentState.Exported -> Text("تم حفظ ${attachmentState.name} في الموقع الذي اخترته", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
                 AttachmentState.Idle -> Unit
             }
             when (val voiceState = voiceMessages.state) {
-                VoiceMessageState.Recording -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("● تسجيل ${formatDuration(voiceMessages.elapsedSeconds)} · الحد الأقصى 10 دقائق", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    TextButton(voiceMessages::cancel) { Text("إلغاء") }
+                is VoiceMessageState.Recording -> Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (voiceState.paused) "متوقف مؤقتًا ${formatDuration(voiceMessages.elapsedSeconds)}" else "● تسجيل ${formatDuration(voiceMessages.elapsedSeconds)}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        IconButton(voiceMessages::togglePause) { Icon(if (voiceState.paused) Icons.Default.PlayArrow else Icons.Default.Pause, if (voiceState.paused) "استئناف" else "إيقاف مؤقت") }
+                        TextButton(voiceMessages::cancel) { Text("إلغاء") }
+                    }
+                    VoiceWaveform(voiceMessages.waveform, MaterialTheme.colorScheme.error, Modifier.fillMaxWidth().height(34.dp))
                 }
                 VoiceMessageState.Sending -> Text("جارٍ تشفير الرسالة الصوتية ورفعها…", color = AqyalGold, style = MaterialTheme.typography.bodySmall)
                 is VoiceMessageState.Sent -> Text("تم إرسال رسالة صوتية ${formatDuration(voiceState.durationSeconds)}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
@@ -511,11 +527,11 @@ private fun ChatHubScreen(
                 IconButton({ showEmoji = !showEmoji }) { Icon(Icons.Default.EmojiEmotions, "الرموز التعبيرية") }
                 IconButton({ filePicker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/plain", "application/zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")) }, enabled = target.matches(RED_ID_PATTERN) && attachments.state !is AttachmentState.Working) { Icon(Icons.Default.AttachFile, "ملف مشفر") }
                 IconButton({
-                    if (voiceMessages.state == VoiceMessageState.Recording) voiceMessages.stopAndSend(target, conversation)
+                    if (voiceMessages.state is VoiceMessageState.Recording) voiceMessages.stopAndSend(target, conversation)
                     else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) voiceMessages.start(target, conversation)
                     else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
                 }, enabled = target.matches(RED_ID_PATTERN) && voiceMessages.state !is VoiceMessageState.Sending) {
-                    Icon(if (voiceMessages.state == VoiceMessageState.Recording) Icons.Default.Stop else Icons.Default.Mic, if (voiceMessages.state == VoiceMessageState.Recording) "إيقاف وإرسال" else "تسجيل رسالة صوتية")
+                    Icon(if (voiceMessages.state is VoiceMessageState.Recording) Icons.Default.Stop else Icons.Default.Mic, if (voiceMessages.state is VoiceMessageState.Recording) "إيقاف وإرسال" else "تسجيل رسالة صوتية")
                 }
                 OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
                 FilledIconButton({
@@ -820,6 +836,19 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 @Composable private fun FeatureCard(title: String, detail: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) { Text(title, color = AqyalGold, fontWeight = FontWeight.Bold); Text(detail) } }
 
 @Composable
+private fun VoiceWaveform(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val samples = values.ifEmpty { List(24) { 8 } }
+        val step = size.width / samples.size.coerceAtLeast(1)
+        samples.forEachIndexed { index, value ->
+            val height = (size.height * (value.coerceIn(4, 100) / 100f)).coerceAtLeast(3f)
+            val x = step * index + step / 2
+            drawLine(color, start = androidx.compose.ui.geometry.Offset(x, (size.height - height) / 2), end = androidx.compose.ui.geometry.Offset(x, (size.height + height) / 2), strokeWidth = (step * .42f).coerceIn(2f, 7f), cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
 private fun VoiceMessage(item: DecryptedMessage, attachments: AttachmentViewModel) {
     val manifestJson = item.plaintext.toString(Charsets.UTF_8)
     val manifest = remember(manifestJson) { runCatching { ATTACHMENT_JSON.decodeFromString<VoiceManifest>(manifestJson) }.getOrNull() }
@@ -827,13 +856,18 @@ private fun VoiceMessage(item: DecryptedMessage, attachments: AttachmentViewMode
         Text("رسالة صوتية غير صالحة", color = MaterialTheme.colorScheme.error)
         return
     }
-    val downloaded = attachments.state as? AttachmentState.Downloaded
-    if (downloaded?.name == manifest.name) {
-        StoryVideoPlayer(android.net.Uri.fromFile(java.io.File(downloaded.path)), Modifier.fillMaxWidth().height(92.dp))
+    val downloaded = when (val current = attachments.state) {
+        is AttachmentState.Downloaded -> current.path to current.name
+        is AttachmentState.Exported -> current.path to current.name
+        else -> null
+    }
+    if (downloaded?.second == manifest.name) {
+        VoiceNotePlayer(android.net.Uri.fromFile(java.io.File(downloaded.first)), Modifier.fillMaxWidth())
     } else Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Mic, null, tint = if (item.outgoing) Color(0xFF00382A) else YounesEmerald)
         Column(Modifier.weight(1f).padding(horizontal = 9.dp)) {
             Text("رسالة صوتية", fontWeight = FontWeight.SemiBold)
+            VoiceWaveform(manifest.waveform, if (item.outgoing) Color(0xFF00513E) else YounesEmerald, Modifier.fillMaxWidth().height(30.dp))
             Text("${formatDuration(manifest.durationSeconds)} · ${formatBytes(manifest.size)}", style = MaterialTheme.typography.labelSmall)
         }
         IconButton({ attachments.download(manifestJson) }, enabled = attachments.state !is AttachmentState.Working) {

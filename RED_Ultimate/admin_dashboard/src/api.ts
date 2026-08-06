@@ -11,20 +11,27 @@ export const authStore = {
   clear() {
     sessionStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    window.dispatchEvent(new Event('younes:auth-expired'));
   }
 };
 
 async function rotate(): Promise<boolean> {
   const refreshToken = authStore.refresh();
-  if (!refreshToken) return false;
-  const response = await fetch('/api/auth/refresh', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken })
-  });
-  if (!response.ok) { authStore.clear(); return false; }
-  const data = await response.json();
-  authStore.set(data.accessToken, data.refreshToken);
-  return true;
+  if (!refreshToken) { authStore.clear(); return false; }
+  try {
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    });
+    if (!response.ok) { authStore.clear(); return false; }
+    const data = await response.json();
+    if (!data.accessToken || !data.refreshToken) { authStore.clear(); return false; }
+    authStore.set(data.accessToken, data.refreshToken);
+    return true;
+  } catch {
+    // Keep the refresh token during a temporary network outage; it may still be valid.
+    return false;
+  }
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {

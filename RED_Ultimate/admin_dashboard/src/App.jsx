@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Button, ConfigProvider, Layout, Menu, Spin, theme } from 'antd';
 import { authStore } from './api';
 import Login from './pages/Login';
@@ -31,6 +31,12 @@ const menuItems = [
 function App() {
     const [authenticated, setAuthenticated] = useState(Boolean(authStore.access() || authStore.refresh()));
     const [currentPage, setCurrentPage] = useState('dashboard');
+
+    useEffect(() => {
+        const expire = () => setAuthenticated(false);
+        window.addEventListener('younes:auth-expired', expire);
+        return () => window.removeEventListener('younes:auth-expired', expire);
+    }, []);
 
     if (!authenticated) return <Login onSuccess={() => setAuthenticated(true)} />;
 

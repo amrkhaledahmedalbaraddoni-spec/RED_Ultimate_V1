@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder
@@ -30,13 +31,26 @@ class SecurityConfig(
             .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .exceptionHandling { exceptions ->
+                exceptions
+                    .authenticationEntryPoint { _, response, _ ->
+                        response.status = 401
+                        response.contentType = MediaType.APPLICATION_JSON_VALUE
+                        response.writer.write("{\"error\":\"AUTHENTICATION_REQUIRED\"}")
+                    }
+                    .accessDeniedHandler { _, response, _ ->
+                        response.status = 403
+                        response.contentType = MediaType.APPLICATION_JSON_VALUE
+                        response.writer.write("{\"error\":\"ADMIN_ROLE_REQUIRED\"}")
+                    }
+            }
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/recover").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/identity/authority").permitAll()
                     .requestMatchers("/health", "/actuator/health").permitAll()
                     .requestMatchers("/ws/**").permitAll()
-                    .requestMatchers("/api/admin/**", "/api/master/admin/**", "/api/master/v1/auth/**")
+                    .requestMatchers("/api/admin/**", "/api/master/admin/**", "/api/master/v1/**")
                     .hasRole("ADMIN")
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().authenticated()
@@ -50,7 +64,7 @@ class SecurityConfig(
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration().apply {
             allowedOriginPatterns = configuredAllowedOrigins.split(',').map(String::trim).filter(String::isNotEmpty)
-            allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             allowedHeaders = listOf("Authorization", "Content-Type", "X-Requested-With")
             exposedHeaders = listOf("Location")
             allowCredentials = true

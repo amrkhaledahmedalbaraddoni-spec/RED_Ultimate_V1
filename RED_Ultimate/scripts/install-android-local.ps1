@@ -6,7 +6,9 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $RepoRoot = Split-Path -Parent $Root
 if (-not $ApkPath) { $ApkPath = Join-Path $RepoRoot 'local-artifacts\red-app-debug.apk' }
-if (-not (Test-Path $ApkPath)) { throw "APK not found: $ApkPath" }
+if (-not (Test-Path $ApkPath)) {
+    throw "APK not found: $ApkPath. Build it first with scripts\build-android-local.ps1 -ServerIp <LAN-IP>."
+}
 
 $ToolsRoot = Join-Path $RepoRoot 'local-tools'
 $Adb = Join-Path $ToolsRoot 'platform-tools\adb.exe'
@@ -32,7 +34,7 @@ if ($authorized.Count -eq 0) {
 }
 if ($authorized.Count -gt 1) { throw 'More than one Android device is connected; disconnect extras for this Alpha test.' }
 
-Write-Host "Installing verified RED debug APK ($((Get-Item $ApkPath).Length) bytes)..."
+Write-Host "Installing verified YOUNES debug APK ($((Get-Item $ApkPath).Length) bytes)..."
 # Windows PowerShell can promote native stderr to a terminating ErrorRecord when the script uses
 # ErrorActionPreference=Stop. Capture ADB's expected signature diagnostic without aborting our handler.
 $previousErrorPreference = $ErrorActionPreference
@@ -44,17 +46,17 @@ $installText = ($installOutput | ForEach-Object { $_.ToString() }) -join "`n"
 Write-Host $installText
 if ($installExit -ne 0 -and $installText -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') {
     if (-not $ReplaceIncompatible) {
-        throw 'An older RED build uses another debug signature. Rerun with -ReplaceIncompatible to uninstall it (this deletes that app local data) and install the stable-signed Alpha.'
+        throw 'An older YOUNES/RED Alpha uses another debug signature. Rerun with -ReplaceIncompatible to uninstall it (this deletes that app local data) and install the stable-signed Alpha.'
     }
     Write-Warning 'Removing incompatible Alpha package and its local data once.'
     & $Adb uninstall com.red.sovereign
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to remove incompatible RED package' }
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to remove incompatible YOUNES package' }
     & $Adb install -t $ApkPath
     if ($LASTEXITCODE -ne 0) { throw 'ADB installation failed after removing incompatible package' }
 } elseif ($installExit -ne 0) {
     throw 'ADB installation failed'
 }
 $package = (& $Adb shell pm list packages com.red.sovereign)
-if ($package -notmatch 'package:com.red.sovereign') { throw 'RED package was not found after installation' }
-Write-Host 'RED_INSTALL_PASS package=com.red.sovereign'
-Write-Host 'Launch RED on the phone, then use Discover and verify local server before registration.'
+if ($package -notmatch 'package:com.red.sovereign') { throw 'YOUNES package was not found after installation' }
+Write-Host 'YOUNES_INSTALL_PASS package=com.red.sovereign'
+Write-Host 'Launch YOUNES on the phone, then use Discover and verify local server before registration.'

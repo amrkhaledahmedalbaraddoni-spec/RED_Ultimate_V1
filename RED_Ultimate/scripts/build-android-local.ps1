@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][ValidatePattern('^([0-9]{1,3}\.){3}[0-9]{1,3}$')][string]$ServerIp,
-    [ValidateRange(1024, 65535)][int]$HttpPort = 8088
+    [ValidateRange(1024, 65535)][int]$HttpPort = 8088,
+    [ValidateSet('arm64-v8a', 'armeabi-v7a', 'x86_64')][string]$TargetAbi = 'arm64-v8a'
 )
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -25,6 +26,7 @@ try {
     Write-Host "Building RED Android artifact for the configured LAN endpoint..."
     & docker build --file Dockerfile --target android-artifact `
         --build-arg "RED_SERVER_URL=$ServerUrl" `
+        --build-arg "RED_TARGET_ABI=$TargetAbi" `
         --output "type=local,dest=$Artifacts" .
     if ($LASTEXITCODE -ne 0) { throw 'Android artifact build failed' }
 } finally { Pop-Location }

@@ -5,6 +5,8 @@ plugins {
 }
 
 val redServerUrl = providers.gradleProperty("RED_SERVER_URL").orElse("http://192.168.1.50")
+val redTargetAbi = providers.gradleProperty("RED_TARGET_ABI").orElse("arm64-v8a")
+require(redTargetAbi.get() in setOf("arm64-v8a", "armeabi-v7a", "x86_64")) { "Unsupported RED_TARGET_ABI" }
 
 android {
     namespace = "com.red.sovereign"
@@ -17,6 +19,7 @@ android {
         versionCode = 1
         versionName = "1.0.0-alpha01"
         buildConfigField("String", "RED_SERVER_URL", "\"${redServerUrl.get()}\"")
+        ndk { abiFilters += redTargetAbi.get() }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

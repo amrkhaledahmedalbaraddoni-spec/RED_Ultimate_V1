@@ -12,6 +12,7 @@ RUN --mount=type=cache,target=/home/gradle/.gradle/caches,sharing=locked \
 
 FROM ghcr.io/cirruslabs/android-sdk:35 AS android-builder
 ARG RED_SERVER_URL=http://127.0.0.1
+ARG RED_TARGET_ABI=arm64-v8a
 WORKDIR /build/RED_Ultimate
 COPY RED_Ultimate/build.gradle.kts RED_Ultimate/settings.gradle.kts RED_Ultimate/gradle.properties RED_Ultimate/gradlew ./
 COPY RED_Ultimate/gradle/ gradle/
@@ -28,7 +29,7 @@ RUN --mount=type=cache,target=/root/.gradle/caches,sharing=locked \
     && sh ./gradlew \
        -Dorg.gradle.jvmargs="-Xmx3g -Xms256m -XX:MaxMetaspaceSize=768m" \
        -Dkotlin.daemon.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=512m" \
-       :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" -PRED_SKIP_BUILD_LOGIC=true \
+       :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" -PRED_TARGET_ABI="$RED_TARGET_ABI" -PRED_SKIP_BUILD_LOGIC=true \
        --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 

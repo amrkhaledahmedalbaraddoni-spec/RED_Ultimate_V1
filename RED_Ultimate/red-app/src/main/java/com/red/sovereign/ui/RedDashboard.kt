@@ -27,17 +27,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
@@ -117,6 +121,9 @@ import com.red.sovereign.crypto.SafetyState
 import com.red.sovereign.crypto.SafetyViewModel
 import com.red.sovereign.groups.GroupState
 import com.red.sovereign.groups.GroupViewModel
+import com.red.sovereign.media.AttachmentManifest
+import com.red.sovereign.media.AttachmentState
+import com.red.sovereign.media.AttachmentViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -132,6 +139,8 @@ import com.red.sovereign.ui.theme.AqyalRoyalBlue
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
 import com.red.sovereign.ui.theme.AqyalSurfaceRaised
 import com.red.sovereign.ui.theme.YounesEmerald
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 
 private enum class MainSection(val label: String, val icon: ImageVector) {
@@ -154,6 +163,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     val groups: GroupViewModel = viewModel()
     val directory: DirectoryViewModel = viewModel()
     val safety: SafetyViewModel = viewModel()
+    val attachments: AttachmentViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -184,8 +194,8 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             when {
                 showDinstar -> DinstarPhoneScreen(account, viewModel)
                 section == MainSection.HOME -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                section == MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety, showGroups = false)
-                section == MainSection.GROUPS -> ChatHubScreen(account, groups, directory, safety, showGroups = true)
+                section == MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety, attachments, showGroups = false)
+                section == MainSection.GROUPS -> ChatHubScreen(account, groups, directory, safety, attachments, showGroups = true)
                 section == MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 else -> MoreScreen(account, onDinstar = { showDinstar = true }, onSettings = { showSettings = true }, onContacts = { section = MainSection.CHATS })
             }
@@ -383,6 +393,7 @@ private fun ChatHubScreen(
     groups: GroupViewModel,
     directory: DirectoryViewModel,
     safety: SafetyViewModel,
+    attachments: AttachmentViewModel,
     showGroups: Boolean
 ) {
     val tab = if (showGroups) 1 else 0
@@ -392,8 +403,12 @@ private fun ChatHubScreen(
     var directoryQuery by remember { mutableStateOf("") }
     var reportDetails by remember { mutableStateOf("") }
     var messageText by remember { mutableStateOf("") }
+    var showEmoji by remember { mutableStateOf(false) }
     val decrypted = remember { mutableStateListOf<DecryptedMessage>() }
     val context = LocalContext.current
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null && target.isNotBlank()) attachments.send(uri, target, conversationId(account.redId, target))
+    }
     var showSafetyScanner by remember { mutableStateOf(false) }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         showSafetyScanner = granted
@@ -451,17 +466,30 @@ private fun ChatHubScreen(
                         ) {
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                 Text(if (item.outgoing) "أنت" else item.senderRedId, color = if (item.outgoing) Color(0xB8002018) else AqyalCyanGlow, fontSize = 10.sp)
-                                Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
+                                if (item.type == "FILE") AttachmentMessage(item, attachments)
+                                else Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
                             }
                         }
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (showEmoji) LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                items(QUICK_EMOJI) { emoji -> TextButton({ messageText += emoji }) { Text(emoji, fontSize = 22.sp) } }
+            }
+            when (val attachmentState = attachments.state) {
+                is AttachmentState.Working -> Text(attachmentState.message, color = AqyalGold, style = MaterialTheme.typography.bodySmall)
+                is AttachmentState.Error -> Text("تعذر إكمال المرفق: ${attachmentState.message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                is AttachmentState.Sent -> Text("تم إرسال ${attachmentState.name} مشفرًا", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
+                is AttachmentState.Downloaded -> Text("تم التحقق وفك التشفير: ${attachmentState.name}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
+                AttachmentState.Idle -> Unit
+            }
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton({ showEmoji = !showEmoji }) { Icon(Icons.Default.EmojiEmotions, "الرموز التعبيرية") }
+                IconButton({ filePicker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/plain", "application/zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")) }, enabled = target.matches(RED_ID_PATTERN) && attachments.state !is AttachmentState.Working) { Icon(Icons.Default.AttachFile, "ملف مشفر") }
                 OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
                 FilledIconButton({
-                    RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""
-                }, enabled = target.matches(Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
+                    RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""; showEmoji = false
+                }, enabled = target.matches(RED_ID_PATTERN) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
             }
         } else Column(Modifier.fillMaxSize().padding(14.dp)) {
             Button({ create = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Text(" إنشاء مجموعة") }
@@ -759,6 +787,36 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 
 @Composable private fun EmptyState(icon: ImageVector, title: String, detail: String) = Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = AqyalGold, modifier = Modifier.size(62.dp)); Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, textAlign = TextAlign.Center, color = Color.Gray, modifier = Modifier.padding(top = 8.dp)) }
 @Composable private fun FeatureCard(title: String, detail: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) { Text(title, color = AqyalGold, fontWeight = FontWeight.Bold); Text(detail) } }
+
+@Composable
+private fun AttachmentMessage(item: DecryptedMessage, attachments: AttachmentViewModel) {
+    val manifestJson = item.plaintext.toString(Charsets.UTF_8)
+    val manifest = remember(manifestJson) { runCatching { ATTACHMENT_JSON.decodeFromString<AttachmentManifest>(manifestJson) }.getOrNull() }
+    if (manifest == null) {
+        Text("مرفق مشفر غير صالح", color = MaterialTheme.colorScheme.error)
+        return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.InsertDriveFile, null, modifier = Modifier.size(32.dp))
+        Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Text(manifest.name, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+            Text("${manifest.mimeType} · ${formatBytes(manifest.size)}", style = MaterialTheme.typography.labelSmall)
+        }
+        IconButton({ attachments.download(manifestJson) }, enabled = attachments.state !is AttachmentState.Working) {
+            Icon(Icons.Default.Download, "تنزيل وفك تشفير المرفق")
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
+    else -> "$bytes B"
+}
+
+private val RED_ID_PATTERN = Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
+private val QUICK_EMOJI = listOf("😀", "😂", "😍", "👍", "❤️", "🔥", "👏", "🙏", "🎉", "😢", "😮", "✅")
+private val ATTACHMENT_JSON = Json { ignoreUnknownKeys = true }
 
 private fun conversationId(first: String, second: String): String {
     if (first.isBlank() || second.isBlank()) return "pending-conversation"

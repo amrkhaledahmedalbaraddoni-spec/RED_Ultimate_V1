@@ -6,10 +6,12 @@ import android.provider.OpenableColumns
 import com.red.sovereign.auth.ApiResult
 import com.red.sovereign.auth.AuthorizedApiClient
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okio.BufferedSink
 import okio.source
 import java.io.File
@@ -39,6 +41,22 @@ class MediaApi(private val context: Context, private val client: AuthorizedApiCl
         File(context.cacheDir, "story_media").listFiles()?.forEach(File::delete)
     }
 
+    suspend fun uploadEncrypted(file: File, displayName: String): ApiResult<MediaObject> {
+        require(file.isFile && file.length() in 1..100L * 1024 * 1024)
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", "$displayName.bin", file.asRequestBody("application/octet-stream".toMediaType()))
+            .build()
+        return decodeUpload(client.requestBody("POST", "/api/media", body))
+    }
+
+    suspend fun grant(objectKey: String, targetRedId: String): ApiResult<String> =
+        client.request("POST", "/api/media/grants", json.encodeToString(MediaGrantRequest(objectKey, targetRedId)))
+
+    suspend fun delete(path: String): ApiResult<String> {
+        require(path.startsWith("/api/media/") && !path.contains(".."))
+        return client.request("DELETE", path)
+    }
+
     suspend fun upload(uri: Uri): ApiResult<MediaObject> {
         val resolver = context.contentResolver
         val mime = resolver.getType(uri) ?: return ApiResult.Error(null, "UNKNOWN_MEDIA_TYPE")
@@ -58,10 +76,14 @@ class MediaApi(private val context: Context, private val client: AuthorizedApiCl
         }
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", name, streamBody).build()
-        return when (val result = client.requestBody("POST", "/api/media", body)) {
-            is ApiResult.Success -> runCatching { ApiResult.Success(result.code, json.decodeFromString<MediaObject>(result.value)) }
-                .getOrElse { ApiResult.Error(result.code, "INVALID_MEDIA_RESPONSE") }
-            is ApiResult.Error -> result
-        }
+        return decodeUpload(client.requestBody("POST", "/api/media", body))
+    }
+
+    private fun decodeUpload(result: ApiResult<String>): ApiResult<MediaObject> = when (result) {
+        is ApiResult.Success -> runCatching { ApiResult.Success(result.code, json.decodeFromString<MediaObject>(result.value)) }
+            .getOrElse { ApiResult.Error(result.code, "INVALID_MEDIA_RESPONSE") }
+        is ApiResult.Error -> result
     }
 }
+
+@Serializable data class MediaGrantRequest(val objectKey: String, val targetRedId: String)

@@ -14,13 +14,15 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Query
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 class MediaAccessServiceTest {
     private val mongo: MongoTemplate = mock()
-    private val service = MediaAccessService(mongo)
+    private val jdbc: JdbcTemplate = mock()
+    private val service = MediaAccessService(mongo, jdbc)
     private val owner = UUID.randomUUID()
     private val foreignKey = "users/${UUID.randomUUID()}/${UUID.randomUUID()}.mp4"
 

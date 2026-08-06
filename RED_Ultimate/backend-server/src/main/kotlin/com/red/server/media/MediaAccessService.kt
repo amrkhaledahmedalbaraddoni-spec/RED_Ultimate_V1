@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.http.HttpStatus
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
@@ -12,10 +13,18 @@ import java.util.UUID
 
 /** Object-level authorization for authenticated media downloads. */
 @Service
-class MediaAccessService(private val mongo: MongoTemplate) {
+class MediaAccessService(private val mongo: MongoTemplate, private val jdbc: JdbcTemplate) {
     fun requireDownloadAllowed(accountId: UUID, key: String) {
         val ownerId = key.substringAfter("users/", "").substringBefore('/')
         if (ownerId == accountId.toString()) return
+        val explicitlyGranted = jdbc.queryForObject(
+            """SELECT EXISTS(SELECT 1 FROM media_grants WHERE object_key=? AND grantee_id=?
+               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP))""",
+            Boolean::class.java,
+            key,
+            accountId
+        ) == true
+        if (explicitlyGranted) return
 
         val activeStory = mongo.exists(
             Query(Criteria.where("mediaKey").`is`(key)

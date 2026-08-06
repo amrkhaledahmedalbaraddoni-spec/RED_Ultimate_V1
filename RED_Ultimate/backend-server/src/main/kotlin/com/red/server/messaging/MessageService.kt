@@ -137,6 +137,6 @@ class MessageService(
 
     companion object {
         private val RED_ID = Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
-        private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "FILE", "SYSTEM")
+        private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "VOICE", "FILE", "SYSTEM")
     }
 }

@@ -33,7 +33,7 @@ class RedConnectionService : Service() {
     private var reconnectTask: ScheduledFuture<*>? = null
     private var attempts = 0
     @Volatile private var connected = false
-    private val pendingSends = ConcurrentLinkedQueue<PendingText>()
+    private val pendingSends = ConcurrentLinkedQueue<PendingSend>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var tokenStore: TokenStore
     private lateinit var messageStore: MessageStore
@@ -61,11 +61,12 @@ class RedConnectionService : Service() {
         if (intent?.action == ACTION_MARK_READ) {
             val messageId = intent.getStringExtra(EXTRA_MESSAGE_ID) ?: return START_STICKY
             socket.acknowledge(messageId, intent.getLongExtra(EXTRA_SEQUENCE, 0), "READ")
-        } else if (intent?.action == ACTION_SEND_TEXT) {
+        } else if (intent?.action == ACTION_SEND_PAYLOAD) {
             val target = intent.getStringExtra(EXTRA_TARGET) ?: return START_STICKY
             val conversation = intent.getStringExtra(EXTRA_CONVERSATION) ?: return START_STICKY
-            val text = intent.getStringExtra(EXTRA_TEXT) ?: return START_STICKY
-            pendingSends.add(PendingText(target, conversation, text))
+            val type = intent.getStringExtra(EXTRA_TYPE)?.takeIf { it in ALLOWED_MESSAGE_TYPES } ?: return START_STICKY
+            val payload = intent.getByteArrayExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotEmpty() && it.size <= 256 * 1024 } ?: return START_STICKY
+            pendingSends.add(PendingSend(target, conversation, type, payload))
             if (connected) drainSends() else socket.connect()
         } else socket.connect()
         return START_STICKY
@@ -74,21 +75,24 @@ class RedConnectionService : Service() {
     private fun drainSends() {
         while (connected) {
             val pending = pendingSends.poll() ?: break
-            sendEncryptedText(pending.target, pending.conversation, pending.text)
+            sendEncryptedPayload(pending)
         }
     }
 
-    private fun sendEncryptedText(target: String, conversation: String, text: String) {
+    private fun sendEncryptedPayload(pending: PendingSend) {
         scope.launch {
-            when (val encrypted = signal.encrypt(target, text.toByteArray(Charsets.UTF_8))) {
+            when (val encrypted = signal.encrypt(pending.target, pending.payload)) {
                 is ApiResult.Error -> notifyConnection("فشل التشفير: ${encrypted.message}")
                 is ApiResult.Success -> {
                     var firstId: String? = null
                     encrypted.value.forEach { envelope ->
-                        val id = socket.sendEncrypted(target, conversation, "TEXT", keyManager.protocolDeviceId(), envelope)
+                        val id = socket.sendEncrypted(pending.target, pending.conversation, pending.type, keyManager.protocolDeviceId(), envelope)
                         if (firstId == null) firstId = id
                     }
-                    firstId?.let { DecryptedMessageBus.publish(DecryptedMessage(it, conversation, tokenStore.redId.orEmpty(), text.toByteArray(), System.currentTimeMillis(), sequence = 0, outgoing = true)) }
+                    firstId?.let { DecryptedMessageBus.publish(DecryptedMessage(
+                        it, pending.conversation, tokenStore.redId.orEmpty(), pending.payload,
+                        System.currentTimeMillis(), sequence = 0, type = pending.type, outgoing = true
+                    )) }
                 }
             }
         }
@@ -143,7 +147,7 @@ class RedConnectionService : Service() {
                         messageStore.save(message)
                         signal.decrypt(message.senderId, message.senderDeviceId, message.ciphertextType, message.payload.toByteArray())
                     }.onSuccess { plaintext ->
-                        DecryptedMessageBus.publish(DecryptedMessage(message.id, message.conversationId, message.senderId, plaintext, message.timestamp, message.sequenceNumber))
+                        DecryptedMessageBus.publish(DecryptedMessage(message.id, message.conversationId, message.senderId, plaintext, message.timestamp, message.sequenceNumber, type = message.type))
                         socket.acknowledge(message.id, message.sequenceNumber, "DELIVERED")
                         notifyEncryptedMessage(message.senderId)
                     }
@@ -199,19 +203,26 @@ class RedConnectionService : Service() {
         private const val CONNECTION_CHANNEL = "red_connection"
         private const val MESSAGE_CHANNEL = "red_messages"
         private const val CONNECTION_NOTIFICATION = 7001
-        private const val ACTION_SEND_TEXT = "com.red.sovereign.SEND_TEXT"
+        private const val ACTION_SEND_PAYLOAD = "com.red.sovereign.SEND_PAYLOAD"
         private const val ACTION_MARK_READ = "com.red.sovereign.MARK_READ"
         private const val EXTRA_MESSAGE_ID = "message_id"
         private const val EXTRA_SEQUENCE = "sequence"
         private const val EXTRA_TARGET = "target"
         private const val EXTRA_CONVERSATION = "conversation"
-        private const val EXTRA_TEXT = "text"
+        private const val EXTRA_TYPE = "type"
+        private const val EXTRA_PAYLOAD = "payload"
+        private val ALLOWED_MESSAGE_TYPES = setOf("TEXT", "FILE", "VOICE")
 
         fun start(context: Context) = context.startForegroundService(Intent(context, RedConnectionService::class.java))
-        fun sendText(context: Context, targetRedId: String, conversationId: String, text: String) = context.startForegroundService(
-            Intent(context, RedConnectionService::class.java).setAction(ACTION_SEND_TEXT)
-                .putExtra(EXTRA_TARGET, targetRedId).putExtra(EXTRA_CONVERSATION, conversationId).putExtra(EXTRA_TEXT, text)
-        )
+        fun sendText(context: Context, targetRedId: String, conversationId: String, text: String) =
+            sendPayload(context, targetRedId, conversationId, "TEXT", text.toByteArray(Charsets.UTF_8))
+
+        fun sendPayload(context: Context, targetRedId: String, conversationId: String, type: String, payload: ByteArray) =
+            context.startForegroundService(
+                Intent(context, RedConnectionService::class.java).setAction(ACTION_SEND_PAYLOAD)
+                    .putExtra(EXTRA_TARGET, targetRedId).putExtra(EXTRA_CONVERSATION, conversationId)
+                    .putExtra(EXTRA_TYPE, type).putExtra(EXTRA_PAYLOAD, payload)
+            )
         fun markRead(context: Context, messageId: String, sequence: Long) = context.startForegroundService(
             Intent(context, RedConnectionService::class.java).setAction(ACTION_MARK_READ)
                 .putExtra(EXTRA_MESSAGE_ID, messageId).putExtra(EXTRA_SEQUENCE, sequence)
@@ -220,4 +231,4 @@ class RedConnectionService : Service() {
     }
 }
 
-private data class PendingText(val target: String, val conversation: String, val text: String)
+private data class PendingSend(val target: String, val conversation: String, val type: String, val payload: ByteArray)

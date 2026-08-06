@@ -16,16 +16,14 @@ class PublicDirectoryControllerTest {
     private val controller = PublicDirectoryController(users)
 
     @Test
-    fun `search returns approved public profiles and excludes caller`() {
+    fun `exact username search returns only approved public profile fields`() {
         val callerId = UUID.randomUUID()
-        whenever(users.findTop20ByStatusAndUsernameContainingIgnoreCaseOrderByUsernameAsc(AccountStatus.APPROVED, "ali"))
-            .thenReturn(listOf(
-                UserAccount(id = callerId, redId = "RED-AAAA-BBBB", username = "ali", displayName = "Caller", status = AccountStatus.APPROVED),
-                UserAccount(redId = "RED-CCCC-DDDD", username = "alithefriend", displayName = "Ali Friend", status = AccountStatus.APPROVED)
-            ))
+        whenever(users.findByUsernameIgnoreCase("alithefriend")).thenReturn(
+            UserAccount(redId = "RED-CCCC-DDDD", username = "alithefriend", displayName = "Ali Friend", status = AccountStatus.APPROVED)
+        )
         val auth = UsernamePasswordAuthenticationToken(callerId.toString(), "token")
 
-        val result = controller.search("ali", auth)
+        val result = controller.search("alithefriend", auth)
 
         assertEquals(1, result.size)
         assertEquals("RED-CCCC-DDDD", result.single().redId)

@@ -20,7 +20,7 @@ class PublicDirectoryController(private val users: UserAccountRepository) {
         val matches = if (term.startsWith("RED-", ignoreCase = true)) {
             listOfNotNull(users.findByRedId(term.uppercase())).filter { it.status == AccountStatus.APPROVED }
         } else {
-            users.findTop20ByStatusAndUsernameContainingIgnoreCaseOrderByUsernameAsc(AccountStatus.APPROVED, term)
+            listOfNotNull(users.findByUsernameIgnoreCase(term)).filter { it.status == AccountStatus.APPROVED }
         }
         return matches.filter { it.id != caller }.map { PublicRedProfile(it.redId, it.username, it.displayName) }
     }

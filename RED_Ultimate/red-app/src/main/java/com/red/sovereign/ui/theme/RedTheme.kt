@@ -91,8 +91,13 @@ private val shapes = Shapes(
 )
 
 @Composable
-fun YounesTheme(content: @Composable () -> Unit) = MaterialTheme(
-    colorScheme = colors,
+fun YounesTheme(highContrast: Boolean = false, content: @Composable () -> Unit) = MaterialTheme(
+    colorScheme = if (highContrast) colors.copy(
+        onBackground = Color.White,
+        onSurface = Color.White,
+        onSurfaceVariant = Color(0xFFE6F2F6),
+        outline = YounesEmeraldGlow
+    ) else colors,
     typography = typography,
     shapes = shapes,
     content = content

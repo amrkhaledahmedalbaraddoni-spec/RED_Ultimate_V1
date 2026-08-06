@@ -17,6 +17,7 @@ import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
 import com.red.sovereign.crypto.SignalSessionManager
 import com.red.sovereign.proto.RedProtos
+import com.red.sovereign.settings.SettingsRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -149,7 +150,10 @@ class RedConnectionService : Service() {
                     }.onSuccess { plaintext ->
                         DecryptedMessageBus.publish(DecryptedMessage(message.id, message.conversationId, message.senderId, plaintext, message.timestamp, message.sequenceNumber, type = message.type))
                         socket.acknowledge(message.id, message.sequenceNumber, "DELIVERED")
-                        notifyEncryptedMessage(message.senderId)
+                        if (SettingsRuntime.current.messageNotifications) notifyEncryptedMessage(
+                            message.senderId,
+                            if (message.type == "TEXT") plaintext.toString(Charsets.UTF_8) else null
+                        )
                     }
                 } else if (message.senderId == tokenStore.redId) {
                     messageStore.save(message, "SENT")
@@ -161,12 +165,13 @@ class RedConnectionService : Service() {
         }
     }
 
-    private fun notifyEncryptedMessage(sender: String) {
+    private fun notifyEncryptedMessage(sender: String, plaintext: String?) {
         val manager = getSystemService(NotificationManager::class.java)
+        val preview = plaintext?.take(120)?.takeIf { SettingsRuntime.current.notificationPreview }
         manager.notify(sender.hashCode(), NotificationCompat.Builder(this, MESSAGE_CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle("رسالة يونس جديدة")
-            .setContentText("رسالة مشفرة من $sender")
+            .setContentText(preview ?: "رسالة مشفرة من $sender")
             .setContentIntent(openAppIntent())
             .setAutoCancel(true)
             .build())

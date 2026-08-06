@@ -23,11 +23,13 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.red.sovereign.settings.SettingsRuntime
 
 @Composable
 fun VoiceNotePlayer(uri: Uri, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var speed by remember(uri) { mutableFloatStateOf(1f) }
+    val preferredSpeed = SettingsRuntime.current.defaultPlaybackSpeed
+    var speed by remember(uri) { mutableFloatStateOf(preferredSpeed) }
     val player = remember(uri) {
         ExoPlayer.Builder(context).build().apply {
             setAudioAttributes(
@@ -35,6 +37,7 @@ fun VoiceNotePlayer(uri: Uri, modifier: Modifier = Modifier) {
                 true
             )
             setMediaItem(MediaItem.fromUri(uri))
+            setPlaybackSpeed(preferredSpeed)
             prepare()
         }
     }

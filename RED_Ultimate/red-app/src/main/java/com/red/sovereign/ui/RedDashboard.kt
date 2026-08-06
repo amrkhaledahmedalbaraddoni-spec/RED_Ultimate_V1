@@ -2,6 +2,8 @@ package com.red.sovereign.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -134,6 +136,9 @@ import com.red.sovereign.media.VoiceManifest
 import com.red.sovereign.media.VoiceMessageState
 import com.red.sovereign.media.VoiceMessageViewModel
 import com.red.sovereign.media.VoiceNotePlayer
+import com.red.sovereign.settings.SettingsRuntime
+import com.red.sovereign.settings.SettingsViewModel
+import com.red.sovereign.settings.YounesSettingsSheet
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -175,6 +180,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     val safety: SafetyViewModel = viewModel()
     val attachments: AttachmentViewModel = viewModel()
     val voiceMessages: VoiceMessageViewModel = viewModel()
+    val settings: SettingsViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -201,7 +207,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            RedTopBar(account.redId, onSettings = { showSettings = true })
+            RedTopBar(account.redId, compact = SettingsRuntime.current.compactMode, onSettings = { showSettings = true })
             when {
                 showDinstar -> DinstarPhoneScreen(account, viewModel)
                 section == MainSection.HOME -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
@@ -219,18 +225,18 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
         onPost = { text -> feed.create(text) { showCreate = false } },
         onStory = { showCreate = false; createStoryPicker.launch(arrayOf("image/*", "video/*")) }
     )
-    if (showSettings) SettingsSheet(account, viewModel::logout) { showSettings = false }
+    if (showSettings) YounesSettingsSheet(account, settings, viewModel::logout) { showSettings = false }
 }
 
 @Composable
-private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
-    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+private fun RedTopBar(redId: String, compact: Boolean, onSettings: () -> Unit) = Row(
+    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 4.dp else 10.dp),
     verticalAlignment = Alignment.CenterVertically
 ) {
     Image(
         painterResource(R.drawable.younes_icon_master),
         contentDescription = "يونس",
-        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)),
+        modifier = Modifier.size(if (compact) 34.dp else 40.dp).clip(RoundedCornerShape(12.dp)),
         contentScale = ContentScale.Crop
     )
     Text(" يونس", fontSize = 24.sp, color = AqyalGold, fontWeight = FontWeight.Black)
@@ -435,7 +441,7 @@ private fun ChatHubScreen(
     }
     LaunchedEffect(Unit) { DecryptedMessageBus.messages.collect { item ->
         decrypted.add(item)
-        if (!item.outgoing) RedConnectionService.markRead(context, item.id, item.sequence)
+        if (!item.outgoing && SettingsRuntime.current.readReceipts) RedConnectionService.markRead(context, item.id, item.sequence)
     } }
     var create by remember { mutableStateOf(false) }
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
@@ -820,19 +826,7 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 
 @Composable private fun CreateOption(icon: ImageVector, title: String, detail: String, enabled: Boolean, click: () -> Unit) = Card(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = click)) { Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = if (enabled) AqyalGold else Color.Gray, modifier = Modifier.size(31.dp)); Column(Modifier.padding(horizontal = 14.dp)) { Text(title, fontWeight = FontWeight.Bold, color = if (enabled) Color.Unspecified else Color.Gray); Text(detail, color = Color.Gray, fontSize = 12.sp) } } }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun SettingsSheet(account: AuthState.Authenticated, logout: () -> Unit, dismiss: () -> Unit) = ModalBottomSheet(onDismissRequest = dismiss) {
-    Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("الإعدادات", fontSize = 25.sp, fontWeight = FontWeight.Bold); FeatureCard("هوية يونس", "@${account.username}\n${account.redId}")
-        FeatureCard("الخصوصية", "مفاتيح الهوية داخل Android Keystore · لا رقم هاتف · لا SMS")
-        FeatureCard("الخادم", "Local-first عبر الشبكة الداخلية أو WireGuard")
-        OutlinedButton(logout, Modifier.fillMaxWidth()) { Text("تسجيل الخروج") }; Spacer(Modifier.height(22.dp))
-    }
-}
-
 @Composable private fun EmptyState(icon: ImageVector, title: String, detail: String) = Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = AqyalGold, modifier = Modifier.size(62.dp)); Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, textAlign = TextAlign.Center, color = Color.Gray, modifier = Modifier.padding(top = 8.dp)) }
-@Composable private fun FeatureCard(title: String, detail: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) { Text(title, color = AqyalGold, fontWeight = FontWeight.Bold); Text(detail) } }
-
 @Composable
 private fun VoiceWaveform(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
@@ -853,6 +847,10 @@ private fun VoiceMessage(item: DecryptedMessage, attachments: AttachmentViewMode
     if (manifest == null) {
         Text("رسالة صوتية غير صالحة", color = MaterialTheme.colorScheme.error)
         return
+    }
+    val context = LocalContext.current
+    LaunchedEffect(item.id, SettingsRuntime.current.autoDownloadWifi, SettingsRuntime.current.autoDownloadMobile) {
+        if (!item.outgoing && shouldAutoDownload(context, manifest.size)) attachments.download(manifestJson)
     }
     val downloaded = when (val current = attachments.state) {
         is AttachmentState.Downloaded -> current.path to current.name
@@ -882,6 +880,10 @@ private fun AttachmentMessage(item: DecryptedMessage, attachments: AttachmentVie
         Text("مرفق مشفر غير صالح", color = MaterialTheme.colorScheme.error)
         return
     }
+    val context = LocalContext.current
+    LaunchedEffect(item.id, SettingsRuntime.current.autoDownloadWifi, SettingsRuntime.current.autoDownloadMobile) {
+        if (!item.outgoing && shouldAutoDownload(context, manifest.size)) attachments.download(manifestJson)
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.InsertDriveFile, null, modifier = Modifier.size(32.dp))
         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
@@ -891,6 +893,19 @@ private fun AttachmentMessage(item: DecryptedMessage, attachments: AttachmentVie
         IconButton({ attachments.download(manifestJson) }, enabled = attachments.state !is AttachmentState.Working) {
             Icon(Icons.Default.Download, "تنزيل وفك تشفير المرفق")
         }
+    }
+}
+
+private fun shouldAutoDownload(context: android.content.Context, sizeBytes: Long): Boolean {
+    val preferences = SettingsRuntime.current
+    if (sizeBytes > preferences.autoDownloadLimitMb * 1024L * 1024L) return false
+    val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
+    val network = manager.activeNetwork ?: return false
+    val capabilities = manager.getNetworkCapabilities(network) ?: return false
+    return when {
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> preferences.autoDownloadWifi
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> preferences.autoDownloadMobile
+        else -> false
     }
 }
 

@@ -1,5 +1,7 @@
 package com.red.sovereign.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
@@ -92,6 +95,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.red.sovereign.R
 import com.red.sovereign.auth.AuthState
@@ -105,6 +109,7 @@ import com.red.sovereign.contacts.PublicRedProfile
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
+import com.red.sovereign.crypto.SafetyQrScanner
 import com.red.sovereign.crypto.SafetyState
 import com.red.sovereign.crypto.SafetyViewModel
 import com.red.sovereign.groups.GroupState
@@ -377,6 +382,11 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
     var messageText by remember { mutableStateOf("") }
     val decrypted = remember { mutableStateListOf<DecryptedMessage>() }
     val context = LocalContext.current
+    var showSafetyScanner by remember { mutableStateOf(false) }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        showSafetyScanner = granted
+        if (!granted) safety.cameraPermissionDenied()
+    }
     LaunchedEffect(Unit) { DecryptedMessageBus.messages.collect { item ->
         decrypted.add(item)
         if (!item.outgoing) RedConnectionService.markRead(context, item.id, item.sequence)
@@ -458,16 +468,34 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
         SafetyState.Closed -> Unit
         is SafetyState.Loading -> AlertDialog(onDismissRequest = safety::close, title = { Text("رمز الأمان") }, text = { Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }, confirmButton = { TextButton(safety::close) { Text("إلغاء") } })
         is SafetyState.Error -> AlertDialog(onDismissRequest = safety::close, title = { Text("تعذر التحقق") }, text = { Text(safetyState.message) }, confirmButton = { TextButton(safety::close) { Text("إغلاق") } })
-        is SafetyState.Ready -> AlertDialog(
-            onDismissRequest = safety::close,
+        is SafetyState.Ready -> if (showSafetyScanner) AlertDialog(
+            onDismissRequest = { showSafetyScanner = false },
+            title = { Text("امسح رمز الطرف الآخر") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(16.dp))) {
+                        SafetyQrScanner(onCode = { safety.verifyScanned(it); showSafetyScanner = false })
+                    }
+                    Text("تتم المعالجة على الجهاز فقط، ولا تُرفع صور الكاميرا إلى الخادم.", fontSize = 11.sp, textAlign = TextAlign.Center)
+                }
+            },
+            confirmButton = { TextButton({ showSafetyScanner = false }) { Text("إلغاء") } }
+        ) else AlertDialog(
+            onDismissRequest = { safety.clearScanError(); safety.close() },
             title = { Text(if (safetyState.verified) "تم التحقق من الهوية" else "مقارنة رمز الأمان") },
             text = { Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Image(safetyState.qr, "QR لرمز الأمان", Modifier.size(240.dp).clip(RoundedCornerShape(12.dp)))
                 Text(safetyState.number, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = AqyalGold)
                 Text("الجهاز ${safetyState.deviceId} · ${safetyState.fingerprint.chunked(8).joinToString(" ")}", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
-                Text("قارن الرقم أو امسح QR وجهًا لوجه/عبر قناة موثوقة. لا يؤكد يونس الهوية تلقائيًا.", fontSize = 11.sp, textAlign = TextAlign.Center)
+                safetyState.scanError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, textAlign = TextAlign.Center) }
+                Text("امسح رمز الطرف الآخر وجهًا لوجه، أو قارن الرقم عبر قناة موثوقة مستقلة.", fontSize = 11.sp, textAlign = TextAlign.Center)
+                if (!safetyState.verified) OutlinedButton({
+                    safety.clearScanError()
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) showSafetyScanner = true
+                    else cameraPermission.launch(Manifest.permission.CAMERA)
+                }, Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Text(" مسح رمز الطرف الآخر") }
             } },
-            confirmButton = { if (!safetyState.verified) Button(safety::markVerified) { Text("الأرقام متطابقة") } else TextButton(safety::close) { Text("تم") } },
+            confirmButton = { if (!safetyState.verified) Button(safety::markVerified) { Text("الأرقام متطابقة يدويًا") } else TextButton(safety::close) { Text("تم") } },
             dismissButton = { if (!safetyState.verified) TextButton(safety::close) { Text("إلغاء") } }
         )
     }

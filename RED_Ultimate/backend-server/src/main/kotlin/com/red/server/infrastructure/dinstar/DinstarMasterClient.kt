@@ -11,8 +11,5 @@ import org.springframework.stereotype.Service
 class DinstarMasterClient(private val hardware: DinstarHardwareService) {
     fun getPortsRealtimeStatus(): List<Map<String, Any>> = hardware.getHardwareStatus()
 
-    fun restartPort(slotIndex: Int): Nothing =
-        throw UnsupportedOperationException(
-            "The configured DINSTAR API does not expose a verified per-port restart operation (slot $slotIndex)"
-        )
+    fun restartPort(slotIndex: Int): Map<String, Any> = hardware.resetPort(slotIndex)
 }

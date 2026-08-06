@@ -36,8 +36,9 @@ spring:
 # RED Sovereign Configuration
 red:
   dinstar:
-    ip: ${DINSTAR_IP:192.168.1.100}
+    ip: ${DINSTAR_IP:192.168.11.1}
     port: ${DINSTAR_PORT:80}
+    scheme: ${DINSTAR_SCHEME:http}
     username: ${DINSTAR_USERNAME:}
     password: ${DINSTAR_PASSWORD:}
 

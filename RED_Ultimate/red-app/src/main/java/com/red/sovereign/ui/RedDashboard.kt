@@ -124,6 +124,8 @@ import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
 import com.red.sovereign.calls.CallHistoryItem
 import com.red.sovereign.calls.CallHistoryViewModel
+import com.red.sovereign.calls.YounesCallOverlay
+import com.red.sovereign.calls.YounesCallService
 import com.red.sovereign.contacts.DirectoryState
 import com.red.sovereign.contacts.DirectoryViewModel
 import com.red.sovereign.contacts.PublicRedProfile
@@ -236,6 +238,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
         onStory = { showCreate = false; createStoryPicker.launch(arrayOf("image/*", "video/*")) }
     )
     if (showSettings) YounesSettingsSheet(account, settings, viewModel::logout) { showSettings = false }
+    YounesCallOverlay()
 }
 
 @Composable
@@ -445,6 +448,7 @@ private fun ChatHubScreen(
     var editingMessageId by remember { mutableStateOf<String?>(null) }
     var pendingForwardMessage by remember { mutableStateOf<DecryptedMessage?>(null) }
     var disappearingDurationMs by remember { mutableStateOf<Long?>(null) }
+    var pendingCallVideo by remember { mutableStateOf(false) }
     var showEmoji by remember { mutableStateOf(false) }
     var create by remember { mutableStateOf(false) }
     var showJoinGroup by remember { mutableStateOf(false) }
@@ -478,6 +482,11 @@ private fun ChatHubScreen(
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && target.matches(RED_ID_PATTERN)) voiceMessages.start(target, conversationId(account.redId, target))
         else if (!granted) voiceMessages.permissionDenied()
+    }
+    val callPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        val audioGranted = grants[Manifest.permission.RECORD_AUDIO] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val cameraGranted = !pendingCallVideo || grants[Manifest.permission.CAMERA] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (audioGranted && cameraGranted && target.matches(RED_ID_PATTERN)) YounesCallService.start(context, target, pendingCallVideo)
     }
     LaunchedEffect(Unit) { DecryptedMessageBus.messages.collect { item ->
         decrypted.add(item)
@@ -528,6 +537,8 @@ private fun ChatHubScreen(
                         Text(activePerson?.displayName ?: target, fontWeight = FontWeight.SemiBold)
                         Text(activePerson?.let { "@${it.username} · ${it.redId}" } ?: target, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    IconButton({ pendingCallVideo = false; callPermissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO)) }) { Icon(Icons.Default.Call, "مكالمة صوتية عبر يونس") }
+                    IconButton({ pendingCallVideo = true; callPermissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA)) }) { Icon(Icons.Default.Videocam, "مكالمة فيديو عبر يونس") }
                     IconButton({ showMessageSearch = true }) { Icon(Icons.Default.Search, "البحث في المحادثة") }
                     IconButton({ safety.open(target) }) { Icon(Icons.Default.Security, "رمز الأمان") }
                     if (activePerson != null) IconButton({ selectedContact = activePerson }) { Icon(Icons.Default.MoreVert, "خيارات المحادثة") }

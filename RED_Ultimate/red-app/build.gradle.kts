@@ -85,6 +85,8 @@ dependencies {
     implementation(libs.google.zxing.core)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.core.telecom)
+    implementation(libs.webrtc.android)
     implementation(project(":shared-proto"))
 
     testImplementation("junit:junit:4.13.2")

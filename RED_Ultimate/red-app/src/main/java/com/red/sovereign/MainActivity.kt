@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.Density
 import androidx.core.content.ContextCompat
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.auth.AuthViewModel
+import com.red.sovereign.calls.YounesCallService
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.settings.SettingsRuntime
 import com.red.sovereign.ui.AuthFlow
@@ -48,7 +49,11 @@ class MainActivity : ComponentActivity() {
                                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
                                 RedConnectionService.start(this@MainActivity)
-                            } else RedConnectionService.stop(this@MainActivity)
+                                YounesCallService.listen(this@MainActivity)
+                            } else {
+                                RedConnectionService.stop(this@MainActivity)
+                                YounesCallService.stop(this@MainActivity)
+                            }
                         }
                         if (state is AuthState.Authenticated) RedDashboard(state, authViewModel) else AuthFlow(authViewModel)
                     }

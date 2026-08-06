@@ -54,6 +54,11 @@ red:
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost,http://127.0.0.1}
     refresh-expiration-days: ${REFRESH_EXPIRATION_DAYS:30}
 
+  turn:
+    host: ${TURN_PUBLIC_HOST:127.0.0.1}
+    port: ${TURN_PORT:3478}
+    secret: ${TURN_SECRET:}
+
   identity-authority:
     private-key-path: ${RED_IDENTITY_PRIVATE_KEY_PATH:}
     public-key-path: ${RED_IDENTITY_PUBLIC_KEY_PATH:}

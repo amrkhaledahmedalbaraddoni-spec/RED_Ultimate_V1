@@ -29,7 +29,8 @@ class CallWebSocketHandler(
                 CallType.valueOf(signal.mode.uppercase()), CallRoute.RED, signal.callId).id
             "ANSWER" -> requireCallId(signal).also(history::answer)
             "END" -> requireCallId(signal).also { history.end(it) }
-            "ICE" -> requireCallId(signal)
+            "ICE", "HOLD", "RESUME" -> requireCallId(signal)
+            "REJECT" -> requireCallId(signal).also { history.end(it) }
             else -> throw IllegalArgumentException("Unsupported call signal type")
         }
 

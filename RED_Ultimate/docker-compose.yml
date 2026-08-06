@@ -31,6 +31,9 @@ services:
       - RED_IDENTITY_PRIVATE_KEY_PATH=/run/secrets/red_identity_private_key.pem
       - RED_IDENTITY_PUBLIC_KEY_PATH=/run/secrets/red_identity_public_key.pem
       - REFRESH_EXPIRATION_DAYS=${REFRESH_EXPIRATION_DAYS:-30}
+      - TURN_SECRET=${TURN_SECRET:?TURN_SECRET is required}
+      - TURN_PUBLIC_HOST=${TURN_PUBLIC_HOST:-127.0.0.1}
+      - TURN_PORT=3478
     volumes:
       - ./secrets:/run/secrets:ro
     depends_on:

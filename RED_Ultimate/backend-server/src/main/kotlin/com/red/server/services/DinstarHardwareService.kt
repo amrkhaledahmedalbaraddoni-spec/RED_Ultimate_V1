@@ -177,7 +177,8 @@ class DinstarHardwareService(
         return client.newCall(request).execute().use { response ->
             require(response.isSuccessful) { "DINSTAR HTTP ${response.code}" }
             @Suppress("UNCHECKED_CAST")
-            mapper.readValue(response.body.bytes(), Map::class.java) as Map<String, Any?>
+            val responseBody = requireNotNull(response.body) { "DINSTAR returned an empty HTTP body" }
+            mapper.readValue(responseBody.bytes(), Map::class.java) as Map<String, Any?>
         }
     }
 

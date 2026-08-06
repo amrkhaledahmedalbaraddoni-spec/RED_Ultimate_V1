@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service
  */
 @Service
 class DinstarMasterClient(private val hardware: DinstarHardwareService) {
-    fun getPortsRealtimeStatus(): List<Map<String, Any>> = hardware.getHardwareStatus()
+    fun getPortsRealtimeStatus(): List<Map<String, Any?>> = hardware.getHardwareStatus()
 
     fun restartPort(slotIndex: Int): Map<String, Any> = hardware.resetPort(slotIndex)
 }

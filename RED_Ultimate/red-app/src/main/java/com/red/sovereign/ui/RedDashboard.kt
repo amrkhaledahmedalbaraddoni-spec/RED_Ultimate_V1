@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
@@ -56,6 +57,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -124,6 +126,9 @@ import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.media.AttachmentManifest
 import com.red.sovereign.media.AttachmentState
 import com.red.sovereign.media.AttachmentViewModel
+import com.red.sovereign.media.VoiceManifest
+import com.red.sovereign.media.VoiceMessageState
+import com.red.sovereign.media.VoiceMessageViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
@@ -164,6 +169,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     val directory: DirectoryViewModel = viewModel()
     val safety: SafetyViewModel = viewModel()
     val attachments: AttachmentViewModel = viewModel()
+    val voiceMessages: VoiceMessageViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -194,8 +200,8 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             when {
                 showDinstar -> DinstarPhoneScreen(account, viewModel)
                 section == MainSection.HOME -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                section == MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety, attachments, showGroups = false)
-                section == MainSection.GROUPS -> ChatHubScreen(account, groups, directory, safety, attachments, showGroups = true)
+                section == MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety, attachments, voiceMessages, showGroups = false)
+                section == MainSection.GROUPS -> ChatHubScreen(account, groups, directory, safety, attachments, voiceMessages, showGroups = true)
                 section == MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 else -> MoreScreen(account, onDinstar = { showDinstar = true }, onSettings = { showSettings = true }, onContacts = { section = MainSection.CHATS })
             }
@@ -394,6 +400,7 @@ private fun ChatHubScreen(
     directory: DirectoryViewModel,
     safety: SafetyViewModel,
     attachments: AttachmentViewModel,
+    voiceMessages: VoiceMessageViewModel,
     showGroups: Boolean
 ) {
     val tab = if (showGroups) 1 else 0
@@ -413,6 +420,10 @@ private fun ChatHubScreen(
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         showSafetyScanner = granted
         if (!granted) safety.cameraPermissionDenied()
+    }
+    val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && target.matches(RED_ID_PATTERN)) voiceMessages.start(target, conversationId(account.redId, target))
+        else if (!granted) voiceMessages.permissionDenied()
     }
     LaunchedEffect(Unit) { DecryptedMessageBus.messages.collect { item ->
         decrypted.add(item)
@@ -466,8 +477,11 @@ private fun ChatHubScreen(
                         ) {
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                 Text(if (item.outgoing) "أنت" else item.senderRedId, color = if (item.outgoing) Color(0xB8002018) else AqyalCyanGlow, fontSize = 10.sp)
-                                if (item.type == "FILE") AttachmentMessage(item, attachments)
-                                else Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
+                                when (item.type) {
+                                    "FILE" -> AttachmentMessage(item, attachments)
+                                    "VOICE" -> VoiceMessage(item, attachments)
+                                    else -> Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
+                                }
                             }
                         }
                     }
@@ -483,9 +497,26 @@ private fun ChatHubScreen(
                 is AttachmentState.Downloaded -> Text("تم التحقق وفك التشفير: ${attachmentState.name}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
                 AttachmentState.Idle -> Unit
             }
+            when (val voiceState = voiceMessages.state) {
+                VoiceMessageState.Recording -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("● تسجيل ${formatDuration(voiceMessages.elapsedSeconds)} · الحد الأقصى 10 دقائق", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(voiceMessages::cancel) { Text("إلغاء") }
+                }
+                VoiceMessageState.Sending -> Text("جارٍ تشفير الرسالة الصوتية ورفعها…", color = AqyalGold, style = MaterialTheme.typography.bodySmall)
+                is VoiceMessageState.Sent -> Text("تم إرسال رسالة صوتية ${formatDuration(voiceState.durationSeconds)}", color = YounesEmerald, style = MaterialTheme.typography.bodySmall)
+                is VoiceMessageState.Error -> Text("تعذر التسجيل: ${voiceState.message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                VoiceMessageState.Idle -> Unit
+            }
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton({ showEmoji = !showEmoji }) { Icon(Icons.Default.EmojiEmotions, "الرموز التعبيرية") }
                 IconButton({ filePicker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/plain", "application/zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")) }, enabled = target.matches(RED_ID_PATTERN) && attachments.state !is AttachmentState.Working) { Icon(Icons.Default.AttachFile, "ملف مشفر") }
+                IconButton({
+                    if (voiceMessages.state == VoiceMessageState.Recording) voiceMessages.stopAndSend(target, conversation)
+                    else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) voiceMessages.start(target, conversation)
+                    else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }, enabled = target.matches(RED_ID_PATTERN) && voiceMessages.state !is VoiceMessageState.Sending) {
+                    Icon(if (voiceMessages.state == VoiceMessageState.Recording) Icons.Default.Stop else Icons.Default.Mic, if (voiceMessages.state == VoiceMessageState.Recording) "إيقاف وإرسال" else "تسجيل رسالة صوتية")
+                }
                 OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
                 FilledIconButton({
                     RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""; showEmoji = false
@@ -789,6 +820,29 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 @Composable private fun FeatureCard(title: String, detail: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) { Text(title, color = AqyalGold, fontWeight = FontWeight.Bold); Text(detail) } }
 
 @Composable
+private fun VoiceMessage(item: DecryptedMessage, attachments: AttachmentViewModel) {
+    val manifestJson = item.plaintext.toString(Charsets.UTF_8)
+    val manifest = remember(manifestJson) { runCatching { ATTACHMENT_JSON.decodeFromString<VoiceManifest>(manifestJson) }.getOrNull() }
+    if (manifest == null) {
+        Text("رسالة صوتية غير صالحة", color = MaterialTheme.colorScheme.error)
+        return
+    }
+    val downloaded = attachments.state as? AttachmentState.Downloaded
+    if (downloaded?.name == manifest.name) {
+        StoryVideoPlayer(android.net.Uri.fromFile(java.io.File(downloaded.path)), Modifier.fillMaxWidth().height(92.dp))
+    } else Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Mic, null, tint = if (item.outgoing) Color(0xFF00382A) else YounesEmerald)
+        Column(Modifier.weight(1f).padding(horizontal = 9.dp)) {
+            Text("رسالة صوتية", fontWeight = FontWeight.SemiBold)
+            Text("${formatDuration(manifest.durationSeconds)} · ${formatBytes(manifest.size)}", style = MaterialTheme.typography.labelSmall)
+        }
+        IconButton({ attachments.download(manifestJson) }, enabled = attachments.state !is AttachmentState.Working) {
+            Icon(Icons.Default.Download, "تنزيل وتشغيل الرسالة الصوتية")
+        }
+    }
+}
+
+@Composable
 private fun AttachmentMessage(item: DecryptedMessage, attachments: AttachmentViewModel) {
     val manifestJson = item.plaintext.toString(Charsets.UTF_8)
     val manifest = remember(manifestJson) { runCatching { ATTACHMENT_JSON.decodeFromString<AttachmentManifest>(manifestJson) }.getOrNull() }
@@ -807,6 +861,8 @@ private fun AttachmentMessage(item: DecryptedMessage, attachments: AttachmentVie
         }
     }
 }
+
+private fun formatDuration(seconds: Int) = "%d:%02d".format(seconds / 60, seconds % 60)
 
 private fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))

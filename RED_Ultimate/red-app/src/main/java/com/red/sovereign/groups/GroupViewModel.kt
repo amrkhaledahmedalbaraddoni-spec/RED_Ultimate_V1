@@ -47,6 +47,23 @@ class GroupViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateRole(group: Group, member: GroupMember, role: String) = viewModelScope.launch {
+        require(role == "ADMIN" || role == "MEMBER")
+        state = GroupState.Saving
+        when (val result = client.request("PATCH", "/api/groups/${group.id}/members/${member.userId}", json.encodeToString(UpdateGroupRoleRequest(role)))) {
+            is ApiResult.Success -> decodeAndStore(result.value) {}
+            is ApiResult.Error -> state = GroupState.Error(result.message)
+        }
+    }
+
+    fun removeMember(group: Group, member: GroupMember) = viewModelScope.launch {
+        state = GroupState.Saving
+        when (val result = client.request("DELETE", "/api/groups/${group.id}/members/${member.userId}")) {
+            is ApiResult.Success -> decodeAndStore(result.value) {}
+            is ApiResult.Error -> state = GroupState.Error(result.message)
+        }
+    }
+
     fun leave(group: Group, done: () -> Unit) = viewModelScope.launch {
         state = GroupState.Saving
         when (val result = client.request("DELETE", "/api/groups/${group.id}/membership")) {

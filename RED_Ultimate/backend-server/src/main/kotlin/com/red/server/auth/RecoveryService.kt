@@ -28,8 +28,9 @@ class RecoveryService(
 
     @Transactional
     fun reset(request: PasswordRecoveryRequest) {
-        require(request.newPassword.length >= 10) { "Password must contain at least 10 characters" }
+        require(request.newPassword.length in 12..128) { "Password must contain 12-128 characters" }
         val user = users.findByRedId(request.redId) ?: throw InvalidRecoveryCodeException()
+        require(!request.newPassword.contains(user.username, ignoreCase = true)) { "Password must not contain the username" }
         val code = codes.findAllByUserIdAndUsedAtIsNull(user.id).firstOrNull { passwords.matches(request.recoveryCode.trim().uppercase(), it.codeHash) }
             ?: throw InvalidRecoveryCodeException()
         code.usedAt = Instant.now(); codes.save(code)

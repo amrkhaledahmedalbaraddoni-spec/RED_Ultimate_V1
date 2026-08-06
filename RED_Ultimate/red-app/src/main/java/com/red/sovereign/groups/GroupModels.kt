@@ -6,3 +6,4 @@ import kotlinx.serialization.Serializable
 @Serializable data class Group(val id: String, val name: String, val description: String? = null, val ownerRedId: String, val createdAt: String, val members: List<GroupMember> = emptyList())
 @Serializable data class CreateGroupRequest(val name: String, val description: String? = null)
 @Serializable data class AddGroupMemberRequest(val redId: String, val role: String = "MEMBER")
+@Serializable data class UpdateGroupRoleRequest(val role: String)

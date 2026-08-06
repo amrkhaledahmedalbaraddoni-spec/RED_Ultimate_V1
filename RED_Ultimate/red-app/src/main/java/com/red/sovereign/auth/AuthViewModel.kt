@@ -153,6 +153,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         "RATE_LIMITED" -> "محاولات كثيرة؛ انتظر قليلاً ثم أعد المحاولة"
         "RED_SERVER_NOT_FOUND_ON_LAN" -> "لم يُعثر على خادم يونس موثوق في الشبكة المحلية"
         "LAN_DISCOVERY_DISABLED_IN_RELEASE" -> "الاكتشاف التلقائي متاح للنسخة المحلية فقط"
+        "Username is already registered" -> "اسم المستخدم محجوز؛ اختر اسمًا آخر"
+        "Password must contain 12-128 characters" -> "كلمة المرور يجب أن تكون بين 12 و128 محرفًا"
+        "Password must not contain the username" -> "لا تستخدم اسم المستخدم داخل كلمة المرور"
+        "Password is too common" -> "كلمة المرور شائعة جدًا؛ اختر عبارة أطول وفريدة"
+        "Display name must be 2-100 visible characters" -> "الاسم الظاهر يجب أن يكون بين محرفين و100 دون رموز تحكم"
         else -> value
     }
 }

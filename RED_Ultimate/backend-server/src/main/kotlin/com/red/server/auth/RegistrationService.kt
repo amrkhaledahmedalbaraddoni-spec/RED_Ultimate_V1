@@ -25,6 +25,10 @@ class RegistrationService(
     private val jwtService: JwtService
 ) {
     private val usernamePattern = Regex("^[a-zA-Z][a-zA-Z0-9_.]{2,31}$")
+    private val COMMON_PASSWORDS = setOf(
+        "123456789012", "password1234", "qwerty123456", "admin12345678",
+        "younes123456", "red123456789", "111111111111", "000000000000"
+    )
 
     @Transactional
     fun register(request: RegisterRequest): AuthResponse {
@@ -33,8 +37,10 @@ class RegistrationService(
         require(usernamePattern.matches(username)) {
             "Username must be 3-32 characters and contain only letters, numbers, dot or underscore"
         }
-        require(displayName.length in 2..100) { "Display name must be 2-100 characters" }
-        require(request.password.length >= 10) { "Password must contain at least 10 characters" }
+        require(displayName.length in 2..100 && displayName.none(Char::isISOControl)) { "Display name must be 2-100 visible characters" }
+        require(request.password.length in 12..128) { "Password must contain 12-128 characters" }
+        require(!request.password.contains(username, ignoreCase = true)) { "Password must not contain the username" }
+        require(!COMMON_PASSWORDS.contains(request.password.lowercase())) { "Password is too common" }
         require(!users.existsByUsernameIgnoreCase(username)) { "Username is already registered" }
 
         val user = try {

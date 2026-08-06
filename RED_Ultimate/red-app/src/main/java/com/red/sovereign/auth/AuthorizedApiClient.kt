@@ -67,6 +67,7 @@ class AuthorizedApiClient(
                 "GET" -> builder.get()
                 "POST" -> builder.post(body ?: EMPTY)
                 "PUT" -> builder.put(body ?: EMPTY)
+                "PATCH" -> builder.patch(body ?: EMPTY)
                 "DELETE" -> builder.delete(body)
                 else -> error("Unsupported HTTP method")
             }

@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -31,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +56,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -113,13 +117,17 @@ private fun WelcomeScreen(server: ServerState, discover: () -> Unit, register: (
 private fun RegisterScreen(submit: (String, String, String) -> Unit, back: () -> Unit) {
     var name by remember { mutableStateOf("") }; var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
-    val valid = name.trim().length >= 2 && username.matches(Regex("^[A-Za-z][A-Za-z0-9_.]{2,31}$")) && password.length >= 10 && password == confirm
+    val validUsername = username.matches(Regex("^[A-Za-z][A-Za-z0-9_.]{2,31}$"))
+    val valid = name.trim().length in 2..100 && validUsername && password.length in 12..128 && !password.contains(username, ignoreCase = true) && password == confirm
     FormColumn("طلب حساب يونس") {
         Text("سيبقى الحساب معلقاً حتى موافقة المسؤول. لا نطلب رقم هاتف أو شريحة.", textAlign = TextAlign.Center)
         Field(name, { name = it }, "الاسم الظاهر")
-        Field(username, { username = it }, "اسم المستخدم", keyboard = KeyboardOptions(imeAction = ImeAction.Next))
-        PasswordField(password, { password = it }, "كلمة المرور — 10 أحرف على الأقل")
-        PasswordField(confirm, { confirm = it }, "تأكيد كلمة المرور")
+        Field(username, { username = it.trim().take(32) }, "اسم المستخدم", keyboard = KeyboardOptions(imeAction = ImeAction.Next))
+        if (username.isNotEmpty() && !validUsername) Text("3–32 محرفًا، يبدأ بحرف ويقبل الأرقام والنقطة والشرطة السفلية", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        PasswordField(password, { password = it.take(128) }, "كلمة المرور — 12 محرفًا على الأقل")
+        if (password.isNotEmpty()) PasswordStrength(password, username)
+        PasswordField(confirm, { confirm = it.take(128) }, "تأكيد كلمة المرور")
+        if (confirm.isNotEmpty() && password != confirm) Text("كلمتا المرور غير متطابقتين", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         Button({ submit(name, username, password) }, Modifier.fillMaxWidth(), enabled = valid) { Text("إنشاء المفاتيح وإرسال الطلب") }
         OutlinedButton(back, Modifier.fillMaxWidth()) { Text("رجوع") }
     }
@@ -145,9 +153,10 @@ private fun RecoveryScreen(submit: (String, String, String) -> Unit, back: () ->
         Text("لا نستخدم SMS أو بريداً. أدخل أحد الرموز التي حفظتها عند إنشاء الحساب.", textAlign = TextAlign.Center)
         Field(redId, { redId = it.uppercase() }, "معرّف يونس")
         Field(code, { code = it.uppercase() }, "رمز الاستعادة")
-        PasswordField(password, { password = it }, "كلمة المرور الجديدة")
-        PasswordField(confirm, { confirm = it }, "تأكيد كلمة المرور")
-        Button({ submit(redId, code, password) }, Modifier.fillMaxWidth(), enabled = redId.isNotBlank() && code.isNotBlank() && password.length >= 10 && password == confirm) { Text("تغيير وإلغاء الجلسات") }
+        PasswordField(password, { password = it.take(128) }, "كلمة المرور الجديدة — 12 محرفًا على الأقل")
+        if (password.isNotEmpty()) PasswordStrength(password, "")
+        PasswordField(confirm, { confirm = it.take(128) }, "تأكيد كلمة المرور")
+        Button({ submit(redId, code, password) }, Modifier.fillMaxWidth(), enabled = redId.isNotBlank() && code.isNotBlank() && password.length in 12..128 && password == confirm) { Text("تغيير وإلغاء الجلسات") }
         OutlinedButton(back, Modifier.fillMaxWidth()) { Text("رجوع") }
     }
 }
@@ -226,4 +235,30 @@ private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Uni
 }
 
 @Composable private fun Field(value: String, change: (String) -> Unit, label: String, keyboard: KeyboardOptions = KeyboardOptions.Default, leading: (@Composable () -> Unit)? = null) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, leadingIcon = leading, singleLine = true, keyboardOptions = keyboard)
-@Composable private fun PasswordField(value: String, change: (String) -> Unit, label: String) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, leadingIcon = { Icon(Icons.Default.Lock, null) }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+@Composable
+private fun PasswordField(value: String, change: (String) -> Unit, label: String) {
+    var visible by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value, change, Modifier.fillMaxWidth(), label = { Text(label) },
+        leadingIcon = { Icon(Icons.Default.Lock, null) },
+        trailingIcon = { IconButton({ visible = !visible }) { Icon(if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (visible) "إخفاء كلمة المرور" else "إظهار كلمة المرور") } },
+        singleLine = true,
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation()
+    )
+}
+
+@Composable
+private fun PasswordStrength(password: String, username: String) {
+    var score = 0
+    if (password.length >= 12) score++
+    if (password.length >= 16) score++
+    if (password.any(Char::isUpperCase) && password.any(Char::isLowerCase)) score++
+    if (password.any(Char::isDigit) || password.any { !it.isLetterOrDigit() }) score++
+    if (username.isNotBlank() && password.contains(username, ignoreCase = true)) score = 0
+    val label = when (score) { 0, 1 -> "ضعيفة"; 2 -> "مقبولة"; 3 -> "قوية"; else -> "قوية جدًا" }
+    val color = when (score) { 0, 1 -> MaterialTheme.colorScheme.error; 2 -> AqyalGold; else -> YounesEmerald }
+    Column(Modifier.fillMaxWidth()) {
+        LinearProgressIndicator(progress = { score / 4f }, modifier = Modifier.fillMaxWidth(), color = color)
+        Text("قوة كلمة المرور: $label", color = color, style = MaterialTheme.typography.bodySmall)
+    }
+}

@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Call
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -127,6 +129,7 @@ import com.red.sovereign.crypto.DecryptedMessageBus
 import com.red.sovereign.crypto.SafetyQrScanner
 import com.red.sovereign.crypto.SafetyState
 import com.red.sovereign.crypto.SafetyViewModel
+import com.red.sovereign.groups.GroupMember
 import com.red.sovereign.groups.GroupState
 import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.media.AttachmentManifest
@@ -445,8 +448,10 @@ private fun ChatHubScreen(
     } }
     var create by remember { mutableStateOf(false) }
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
+    var selectedGroupMember by remember { mutableStateOf<GroupMember?>(null) }
     var memberRedId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var groupDescription by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         if (tab == 0) Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (directory.requests.isNotEmpty()) {
@@ -472,13 +477,31 @@ private fun ChatHubScreen(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(target, { target = it.uppercase() }, Modifier.weight(1f), label = { Text("معرّف يونس للطرف الآخر") }, singleLine = true)
-                IconButton({ showDirectory = true }) { Icon(Icons.Default.Contacts, "البحث عن أشخاص", tint = AqyalGold) }
+            val activePerson = directory.contacts.firstOrNull { it.redId == target }
+            if (target.isBlank()) Card(Modifier.fillMaxWidth().clickable { showDirectory = true }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, tint = YounesEmerald)
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text("بدء محادثة خاصة", fontWeight = FontWeight.SemiBold); Text("ابحث بالاسم الدقيق أو معرّف يونس", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+                }
+            } else Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton({ target = "" }) { Icon(Icons.Default.ArrowBack, "العودة لقائمة الدردشات") }
+                    Avatar((activePerson?.displayName ?: target).take(1))
+                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                        Text(activePerson?.displayName ?: target, fontWeight = FontWeight.SemiBold)
+                        Text(activePerson?.let { "@${it.username} · ${it.redId}" } ?: target, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton({ safety.open(target) }) { Icon(Icons.Default.Security, "رمز الأمان") }
+                    if (activePerson != null) IconButton({ selectedContact = activePerson }) { Icon(Icons.Default.MoreVert, "خيارات المحادثة") }
+                }
             }
             val conversation = remember(account.redId, target) { conversationId(account.redId, target) }
+            val conversationMessages = decrypted.filter { it.conversationId == conversation }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(decrypted.filter { it.conversationId == conversation }, key = { it.id }) { item ->
+                if (target.isNotBlank() && conversationMessages.isEmpty()) item {
+                    Text("ابدأ المحادثة برسالة. التشفير يُنشأ على الجهاز ولا يرى الخادم النص.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp))
+                }
+                items(conversationMessages, key = { it.id }) { item ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.outgoing) Arrangement.End else Arrangement.Start) {
                         Card(
                             Modifier.widthIn(max = 320.dp),
@@ -501,6 +524,7 @@ private fun ChatHubScreen(
                     }
                 }
             }
+            if (target.isNotBlank()) {
             if (showEmoji) EmojiPicker(onEmoji = { messageText += it })
             when (val attachmentState = attachments.state) {
                 is AttachmentState.Working -> Text(attachmentState.message, color = AqyalGold, style = MaterialTheme.typography.bodySmall)
@@ -541,6 +565,7 @@ private fun ChatHubScreen(
                 FilledIconButton({
                     RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""; showEmoji = false
                 }, enabled = target.matches(RED_ID_PATTERN) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
+            }
             }
         } else Column(Modifier.fillMaxSize().padding(14.dp)) {
             Button({ create = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Text(" إنشاء مجموعة") }
@@ -618,9 +643,11 @@ private fun ChatHubScreen(
                     Text(selectedGroup.description.orEmpty(), color = Color.Gray)
                     LazyColumn(Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(selectedGroup.members, key = { it.id }) { member ->
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            val manageable = canManage && member.role != "OWNER" && member.redId != account.redId && (myRole == "OWNER" || member.role == "MEMBER")
+                            Row(Modifier.fillMaxWidth().clickable(enabled = manageable) { selectedGroupMember = member }, verticalAlignment = Alignment.CenterVertically) {
                                 Avatar(member.username.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) { Text("@${member.username}"); Text(member.redId, color = AqyalCyanGlow, fontSize = 10.sp) }
-                                AssistChip({}, { Text(member.role) }, enabled = false)
+                                AssistChip({}, { Text(groupRoleLabel(member.role)) }, enabled = false)
+                                if (manageable) Icon(Icons.Default.MoreVert, "إدارة العضو", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -636,6 +663,22 @@ private fun ChatHubScreen(
             }
         )
     }
+    val managedMember = selectedGroupMember
+    if (selectedGroup != null && managedMember != null) AlertDialog(
+        onDismissRequest = { selectedGroupMember = null },
+        title = { Text("إدارة @${managedMember.username}") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(managedMember.redId, color = AqyalCyanGlow)
+            if (selectedGroup.members.firstOrNull { it.redId == account.redId }?.role == "OWNER") {
+                OutlinedButton({ groups.updateRole(selectedGroup, managedMember, if (managedMember.role == "ADMIN") "MEMBER" else "ADMIN"); selectedGroupMember = null }, Modifier.fillMaxWidth()) {
+                    Text(if (managedMember.role == "ADMIN") "إرجاعه إلى عضو" else "ترقيته إلى مسؤول")
+                }
+            }
+            Button({ groups.removeMember(selectedGroup, managedMember); selectedGroupMember = null }, Modifier.fillMaxWidth()) { Text("إزالة من المجموعة") }
+            Text("تغيير العضوية يجب أن يدور Sender Key عندما تكتمل محادثة المجموعات المشفرة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        } },
+        confirmButton = { TextButton({ selectedGroupMember = null }) { Text("إغلاق") } }
+    )
     if (showDirectory) AlertDialog(
         onDismissRequest = { showDirectory = false; directory.clear() },
         title = { Text("أشخاص يونس") },
@@ -667,9 +710,13 @@ private fun ChatHubScreen(
         confirmButton = { TextButton({ showDirectory = false; directory.clear() }) { Text("إغلاق") } }
     )
     if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة يونس جديدة") },
-        text = { OutlinedTextField(name, { name = it }, label = { Text("اسم المجموعة") }, singleLine = true) },
-        confirmButton = { Button({ groups.create(name, null) { create = false; name = "" } }, enabled = name.trim().length >= 2 && groups.state != GroupState.Saving) { Text("إنشاء") } },
-        dismissButton = { OutlinedButton({ create = false }) { Text("إلغاء") } })
+        text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("اسم المجموعة") }, singleLine = true)
+            OutlinedTextField(groupDescription, { groupDescription = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("الوصف — اختياري") }, minLines = 2, maxLines = 4)
+            Text("ستُنشأ بأدوار مالك ومسؤول وعضو. مراسلة Sender Keys ما زالت غير مفعلة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        } },
+        confirmButton = { Button({ groups.create(name, groupDescription.trim().takeIf(String::isNotEmpty)) { create = false; name = ""; groupDescription = "" } }, enabled = name.trim().length in 2..100 && groups.state != GroupState.Saving) { Text("إنشاء المجموعة") } },
+        dismissButton = { OutlinedButton({ create = false; name = ""; groupDescription = "" }) { Text("إلغاء") } })
 }
 
 @Composable
@@ -908,6 +955,8 @@ private fun shouldAutoDownload(context: android.content.Context, sizeBytes: Long
         else -> false
     }
 }
+
+private fun groupRoleLabel(role: String) = when (role) { "OWNER" -> "المالك"; "ADMIN" -> "مسؤول"; else -> "عضو" }
 
 private fun formatDuration(seconds: Int) = "%d:%02d".format(seconds / 60, seconds % 60)
 

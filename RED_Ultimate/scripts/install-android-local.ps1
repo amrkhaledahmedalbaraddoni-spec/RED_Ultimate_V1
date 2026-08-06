@@ -1,5 +1,6 @@
 param(
-    [string]$ApkPath = ""
+    [string]$ApkPath = "",
+    [switch]$ReplaceIncompatible
 )
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -32,8 +33,22 @@ if ($authorized.Count -eq 0) {
 if ($authorized.Count -gt 1) { throw 'More than one Android device is connected; disconnect extras for this Alpha test.' }
 
 Write-Host "Installing verified RED debug APK ($((Get-Item $ApkPath).Length) bytes)..."
-& $Adb install -r -t $ApkPath
-if ($LASTEXITCODE -ne 0) { throw 'ADB installation failed' }
+$installOutput = @(& $Adb install -r -t $ApkPath 2>&1)
+$installExit = $LASTEXITCODE
+$installText = $installOutput -join "`n"
+Write-Host $installText
+if ($installExit -ne 0 -and $installText -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') {
+    if (-not $ReplaceIncompatible) {
+        throw 'An older RED build uses another debug signature. Rerun with -ReplaceIncompatible to uninstall it (this deletes that app local data) and install the stable-signed Alpha.'
+    }
+    Write-Warning 'Removing incompatible Alpha package and its local data once.'
+    & $Adb uninstall com.red.sovereign
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to remove incompatible RED package' }
+    & $Adb install -t $ApkPath
+    if ($LASTEXITCODE -ne 0) { throw 'ADB installation failed after removing incompatible package' }
+} elseif ($installExit -ne 0) {
+    throw 'ADB installation failed'
+}
 $package = (& $Adb shell pm list packages com.red.sovereign)
 if ($package -notmatch 'package:com.red.sovereign') { throw 'RED package was not found after installation' }
 Write-Host 'RED_INSTALL_PASS package=com.red.sovereign'

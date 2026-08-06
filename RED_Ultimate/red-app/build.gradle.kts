@@ -23,8 +23,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("redLocalDebug") {
+            // Public, debug-only key: stable across Docker/Windows builds so Alpha APK updates work.
+            // Production release signing must use an offline private key and a separate applicationId/version policy.
+            storeFile = file("signing/red-debug.p12")
+            storePassword = "red-debug-only"
+            keyAlias = "reddebug"
+            keyPassword = "red-debug-only"
+            storeType = "PKCS12"
+        }
+    }
+
     buildTypes {
-        debug { manifestPlaceholders["usesCleartext"] = "true" }
+        debug {
+            manifestPlaceholders["usesCleartext"] = "true"
+            signingConfig = signingConfigs.getByName("redLocalDebug")
+        }
         release {
             isMinifyEnabled = true
             manifestPlaceholders["usesCleartext"] = "false"

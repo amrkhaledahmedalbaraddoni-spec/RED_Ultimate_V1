@@ -96,7 +96,21 @@ class RedConnectionService : Service() {
 
     private fun onState(state: ConnectionState) {
         when (state) {
-            ConnectionState.CONNECTED -> { connected = true; attempts = 0; reconnectTask?.cancel(false); notifyConnection("متصل بخادم RED المحلي"); drainSends() }
+            ConnectionState.CONNECTED -> {
+                connected = true
+                attempts = 0
+                reconnectTask?.cancel(false)
+                notifyConnection("متصل بخادم RED المحلي")
+                scope.launch {
+                    when (val stock = signal.replenishPreKeys()) {
+                        is ApiResult.Success -> if (stock.value.ecAvailable < stock.value.minimumRecommended || stock.value.kyberAvailable < stock.value.minimumRecommended) {
+                            notifyConnection("مخزون مفاتيح الجلسات منخفض — ستتم إعادة المحاولة")
+                        }
+                        is ApiResult.Error -> notifyConnection("تعذر تحديث مفاتيح الجلسات الآمنة — ستتم المحاولة عند إعادة الاتصال")
+                    }
+                }
+                drainSends()
+            }
             ConnectionState.CONNECTING -> notifyConnection("جارٍ الاتصال بخادم RED المحلي")
             ConnectionState.DISCONNECTED -> { connected = false; scheduleReconnect() }
             ConnectionState.UNAUTHORIZED -> { connected = false; refreshAndReconnect() }

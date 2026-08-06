@@ -32,6 +32,6 @@ Ensure-Rule 'RED Local HTTPS-Alpha' 'TCP' "$HttpPort"
 if ($EnableMediaPorts) {
     Ensure-Rule 'RED TURN' 'UDP' '3478'
     Ensure-Rule 'RED SFU RTP' 'UDP' '40000-40100'
-    Ensure-Rule 'RED TURN Relay' 'UDP' '49160-49200'
+    Ensure-Rule 'RED TURN Relay' 'UDP' '45000-45050'
 }
 Write-Host 'RED_WINDOWS_LAN_READY'

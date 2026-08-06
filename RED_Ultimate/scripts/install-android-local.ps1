@@ -33,9 +33,14 @@ if ($authorized.Count -eq 0) {
 if ($authorized.Count -gt 1) { throw 'More than one Android device is connected; disconnect extras for this Alpha test.' }
 
 Write-Host "Installing verified RED debug APK ($((Get-Item $ApkPath).Length) bytes)..."
+# Windows PowerShell can promote native stderr to a terminating ErrorRecord when the script uses
+# ErrorActionPreference=Stop. Capture ADB's expected signature diagnostic without aborting our handler.
+$previousErrorPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 $installOutput = @(& $Adb install -r -t $ApkPath 2>&1)
 $installExit = $LASTEXITCODE
-$installText = $installOutput -join "`n"
+$ErrorActionPreference = $previousErrorPreference
+$installText = ($installOutput | ForEach-Object { $_.ToString() }) -join "`n"
 Write-Host $installText
 if ($installExit -ne 0 -and $installText -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') {
     if (-not $ReplaceIncompatible) {

@@ -16,6 +16,8 @@ import com.red.sovereign.auth.TokenStore
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
 import com.red.sovereign.crypto.SignalSessionManager
+import com.red.sovereign.groups.Group
+import com.red.sovereign.groups.GroupCryptoManager
 import com.red.sovereign.proto.RedProtos
 import com.red.sovereign.settings.SettingsRuntime
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -35,10 +39,13 @@ class RedConnectionService : Service() {
     private var attempts = 0
     @Volatile private var connected = false
     private val pendingSends = ConcurrentLinkedQueue<PendingSend>()
+    private val pendingGroupSends = ConcurrentLinkedQueue<PendingGroupSend>()
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var tokenStore: TokenStore
     private lateinit var messageStore: MessageStore
     private lateinit var signal: SignalSessionManager
+    private lateinit var groupCrypto: GroupCryptoManager
     private lateinit var keyManager: DeviceKeyManager
     private lateinit var socket: RedWebSocketClient
 
@@ -48,6 +55,7 @@ class RedConnectionService : Service() {
         tokenStore = TokenStore(this)
         messageStore = MessageStore(this)
         signal = SignalSessionManager(this)
+        groupCrypto = GroupCryptoManager(this)
         keyManager = DeviceKeyManager(this)
         socket = RedWebSocketClient(tokenStore, ::onEnvelope, ::onState)
         scope.launch {
@@ -69,6 +77,11 @@ class RedConnectionService : Service() {
             val payload = intent.getByteArrayExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotEmpty() && it.size <= 256 * 1024 } ?: return START_STICKY
             pendingSends.add(PendingSend(target, conversation, type, payload))
             if (connected) drainSends() else socket.connect()
+        } else if (intent?.action == ACTION_SEND_GROUP_TEXT) {
+            val encodedGroup = intent.getStringExtra(EXTRA_GROUP) ?: return START_STICKY
+            val text = intent.getStringExtra(EXTRA_TEXT)?.takeIf(String::isNotBlank) ?: return START_STICKY
+            pendingGroupSends.add(PendingGroupSend(encodedGroup, text))
+            if (connected) drainGroupSends() else socket.connect()
         } else socket.connect()
         return START_STICKY
     }
@@ -77,6 +90,34 @@ class RedConnectionService : Service() {
         while (connected) {
             val pending = pendingSends.poll() ?: break
             sendEncryptedPayload(pending)
+        }
+    }
+
+    private fun drainGroupSends() {
+        while (connected) {
+            val pending = pendingGroupSends.poll() ?: break
+            val group = runCatching { json.decodeFromString<Group>(pending.groupJson) }.getOrNull() ?: continue
+            scope.launch {
+                when (val prepared = groupCrypto.prepare(group, pending.text.toByteArray(Charsets.UTF_8))) {
+                    is ApiResult.Error -> notifyConnection("تعذر تشفير المجموعة: ${prepared.message}")
+                    is ApiResult.Success -> {
+                        prepared.value.distributions.forEach { distribution ->
+                            socket.sendEncrypted(distribution.receiverRedId, group.id, "GROUP_KEY_DISTRIBUTION", keyManager.protocolDeviceId(), distribution.encrypted)
+                        }
+                        var firstId: String? = null
+                        prepared.value.recipients.forEach { recipient ->
+                            val envelope = prepared.value.groupCiphertext.copy(receiverDeviceId = recipient.protocolDeviceId)
+                            val id = socket.sendEncrypted(recipient.redId, group.id, "GROUP_MESSAGE", keyManager.protocolDeviceId(), envelope)
+                            if (firstId == null) firstId = id
+                        }
+                        firstId?.let {
+                            val bytes = pending.text.toByteArray(Charsets.UTF_8); val timestamp = System.currentTimeMillis()
+                            messageStore.saveDecrypted(LocalMessage(it, group.id, tokenStore.redId.orEmpty(), bytes, "GROUP_MESSAGE", timestamp, true))
+                            DecryptedMessageBus.publish(DecryptedMessage(it, group.id, tokenStore.redId.orEmpty(), bytes, timestamp, 0, type = "GROUP_MESSAGE", outgoing = true))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -90,10 +131,11 @@ class RedConnectionService : Service() {
                         val id = socket.sendEncrypted(pending.target, pending.conversation, pending.type, keyManager.protocolDeviceId(), envelope)
                         if (firstId == null) firstId = id
                     }
-                    firstId?.let { DecryptedMessageBus.publish(DecryptedMessage(
-                        it, pending.conversation, tokenStore.redId.orEmpty(), pending.payload,
-                        System.currentTimeMillis(), sequence = 0, type = pending.type, outgoing = true
-                    )) }
+                    firstId?.let {
+                        val timestamp = System.currentTimeMillis()
+                        messageStore.saveDecrypted(LocalMessage(it, pending.conversation, tokenStore.redId.orEmpty(), pending.payload, pending.type, timestamp, true))
+                        DecryptedMessageBus.publish(DecryptedMessage(it, pending.conversation, tokenStore.redId.orEmpty(), pending.payload, timestamp, sequence = 0, type = pending.type, outgoing = true))
+                    }
                 }
             }
         }
@@ -115,6 +157,7 @@ class RedConnectionService : Service() {
                     }
                 }
                 drainSends()
+                drainGroupSends()
             }
             ConnectionState.CONNECTING -> notifyConnection("جارٍ الاتصال بخادم يونس المحلي")
             ConnectionState.DISCONNECTED -> { connected = false; scheduleReconnect() }
@@ -146,14 +189,22 @@ class RedConnectionService : Service() {
                 if (message.receiverId == tokenStore.redId && message.receiverDeviceId == keyManager.protocolDeviceId()) {
                     runCatching {
                         messageStore.save(message)
-                        signal.decrypt(message.senderId, message.senderDeviceId, message.ciphertextType, message.payload.toByteArray())
+                        when (message.type) {
+                            "GROUP_MESSAGE" -> groupCrypto.decrypt(message.senderId, message.senderDeviceId, message.payload.toByteArray())
+                            else -> signal.decrypt(message.senderId, message.senderDeviceId, message.ciphertextType, message.payload.toByteArray())
+                        }
                     }.onSuccess { plaintext ->
-                        DecryptedMessageBus.publish(DecryptedMessage(message.id, message.conversationId, message.senderId, plaintext, message.timestamp, message.sequenceNumber, type = message.type))
+                        if (message.type == "GROUP_KEY_DISTRIBUTION") {
+                            groupCrypto.processDistribution(message.senderId, message.senderDeviceId, plaintext)
+                        } else {
+                            messageStore.saveDecrypted(LocalMessage(message.id, message.conversationId, message.senderId, plaintext, message.type, message.timestamp, false))
+                            DecryptedMessageBus.publish(DecryptedMessage(message.id, message.conversationId, message.senderId, plaintext, message.timestamp, message.sequenceNumber, type = message.type))
+                            if (SettingsRuntime.current.messageNotifications && messageStore.conversationPreference(message.conversationId).third <= System.currentTimeMillis()) notifyEncryptedMessage(
+                                message.senderId,
+                                if (message.type == "TEXT" || message.type == "GROUP_MESSAGE") plaintext.toString(Charsets.UTF_8) else null
+                            )
+                        }
                         socket.acknowledge(message.id, message.sequenceNumber, "DELIVERED")
-                        if (SettingsRuntime.current.messageNotifications) notifyEncryptedMessage(
-                            message.senderId,
-                            if (message.type == "TEXT") plaintext.toString(Charsets.UTF_8) else null
-                        )
                     }
                 } else if (message.senderId == tokenStore.redId) {
                     messageStore.save(message, "SENT")
@@ -210,12 +261,15 @@ class RedConnectionService : Service() {
         private const val CONNECTION_NOTIFICATION = 7001
         private const val ACTION_SEND_PAYLOAD = "com.red.sovereign.SEND_PAYLOAD"
         private const val ACTION_MARK_READ = "com.red.sovereign.MARK_READ"
+        private const val ACTION_SEND_GROUP_TEXT = "com.red.sovereign.SEND_GROUP_TEXT"
         private const val EXTRA_MESSAGE_ID = "message_id"
         private const val EXTRA_SEQUENCE = "sequence"
         private const val EXTRA_TARGET = "target"
         private const val EXTRA_CONVERSATION = "conversation"
         private const val EXTRA_TYPE = "type"
         private const val EXTRA_PAYLOAD = "payload"
+        private const val EXTRA_GROUP = "group"
+        private const val EXTRA_TEXT = "text"
         private val ALLOWED_MESSAGE_TYPES = setOf("TEXT", "FILE", "VOICE")
 
         fun start(context: Context) = context.startForegroundService(Intent(context, RedConnectionService::class.java))
@@ -228,6 +282,11 @@ class RedConnectionService : Service() {
                     .putExtra(EXTRA_TARGET, targetRedId).putExtra(EXTRA_CONVERSATION, conversationId)
                     .putExtra(EXTRA_TYPE, type).putExtra(EXTRA_PAYLOAD, payload)
             )
+        fun sendGroupText(context: Context, group: Group, text: String) = context.startForegroundService(
+            Intent(context, RedConnectionService::class.java).setAction(ACTION_SEND_GROUP_TEXT)
+                .putExtra(EXTRA_GROUP, Json.encodeToString(group)).putExtra(EXTRA_TEXT, text)
+        )
+
         fun markRead(context: Context, messageId: String, sequence: Long) = context.startForegroundService(
             Intent(context, RedConnectionService::class.java).setAction(ACTION_MARK_READ)
                 .putExtra(EXTRA_MESSAGE_ID, messageId).putExtra(EXTRA_SEQUENCE, sequence)
@@ -237,3 +296,4 @@ class RedConnectionService : Service() {
 }
 
 private data class PendingSend(val target: String, val conversation: String, val type: String, val payload: ByteArray)
+private data class PendingGroupSend(val groupJson: String, val text: String)

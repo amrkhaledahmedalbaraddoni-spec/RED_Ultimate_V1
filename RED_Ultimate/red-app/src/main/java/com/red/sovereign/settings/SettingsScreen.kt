@@ -45,6 +45,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.red.sovereign.auth.AuthState
 import com.red.sovereign.core.ServerEndpoint
 import com.red.sovereign.ui.theme.AqyalGold
@@ -71,6 +73,8 @@ fun YounesSettingsSheet(
     dismiss: () -> Unit
 ) {
     var page by remember { mutableStateOf(SettingsPage.ROOT) }
+    val deviceSettings: DeviceSettingsViewModel = viewModel()
+    LaunchedEffect(page) { if (page == SettingsPage.DEVICES) deviceSettings.load() }
     var confirmLogout by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = dismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
@@ -91,7 +95,7 @@ fun YounesSettingsSheet(
                 SettingsPage.NOTIFICATIONS -> NotificationSettings(viewModel)
                 SettingsPage.DATA -> DataSettings(viewModel)
                 SettingsPage.CALLS -> CallSettings(viewModel)
-                SettingsPage.DEVICES -> DevicesSettings()
+                SettingsPage.DEVICES -> DevicesSettings(deviceSettings)
                 SettingsPage.SERVER -> ServerSettings()
                 SettingsPage.ABOUT -> AboutSettings()
             }
@@ -197,9 +201,20 @@ private fun DestinationRow(row: SettingDestination, click: () -> Unit) = Card(
     item { InfoCard("الهاتف اليمني", "DINSTAR منفصل ويستهلك رصيد الشريحة", Icons.Default.Call) }
 }
 
-@Composable private fun DevicesSettings() = SettingsList {
+@Composable private fun DevicesSettings(vm: DeviceSettingsViewModel) = SettingsList {
     item { InfoCard("شهادة الجهاز", "الدخول والمراسلة يتطلبان جهازًا معتمدًا وشهادة غير منتهية.", Icons.Default.Devices) }
-    item { LockedSetting("إدارة الأجهزة", "واجهة الإلغاء وإعادة التسمية ستُربط بـ Device API قبل تمكينها") }
+    if (vm.loading) item { Text("جارٍ تحميل الأجهزة المعتمدة…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    vm.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+    items(vm.devices, key = { it.id }) { device ->
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Devices, null, tint = if (vm.isCurrent(device)) YounesEmerald else MaterialTheme.colorScheme.onSurfaceVariant); Text(device.deviceName, Modifier.weight(1f).padding(horizontal = 9.dp), fontWeight = FontWeight.SemiBold); Text(if (vm.isCurrent(device)) "هذا الجهاز" else device.status, style = MaterialTheme.typography.labelSmall) }
+                Text("${device.platform} · ${device.identityFingerprint.chunked(8).joinToString(" ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("انتهاء الشهادة: ${device.certificateExpiresAt ?: "غير متاحة"}", style = MaterialTheme.typography.labelSmall)
+                if (!vm.isCurrent(device) && device.status == "APPROVED") OutlinedButton({ vm.revoke(device) }, Modifier.fillMaxWidth()) { Text("إلغاء اعتماد هذا الجهاز") }
+            }
+        }
+    }
     item { LockedSetting("تنبيه تغير المفتاح", "يجب إعادة مقارنة Safety Number عند تغير بصمة الجهاز") }
 }
 

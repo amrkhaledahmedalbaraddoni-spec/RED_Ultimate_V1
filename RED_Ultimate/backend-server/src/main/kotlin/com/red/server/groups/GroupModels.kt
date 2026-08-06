@@ -31,4 +31,6 @@ enum class GroupRole { OWNER, ADMIN, MEMBER }
 data class CreateGroupRequest(val name: String, val description: String? = null)
 data class AddGroupMemberRequest(val redId: String, val role: GroupRole = GroupRole.MEMBER)
 data class UpdateGroupRoleRequest(val role: GroupRole)
-data class GroupResponse(val id: String, val name: String, val description: String?, val ownerRedId: String, val createdAt: Instant, val members: List<GroupMember>)
+data class TransferGroupOwnershipRequest(val targetUserId: java.util.UUID)
+data class UpdateGroupAvatarRequest(val mediaKey: String)
+data class GroupResponse(val id: String, val name: String, val description: String?, val ownerRedId: String, val avatarUrl: String?, val createdAt: Instant, val members: List<GroupMember>)

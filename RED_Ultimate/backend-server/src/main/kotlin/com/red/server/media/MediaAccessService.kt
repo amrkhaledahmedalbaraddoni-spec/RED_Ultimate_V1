@@ -1,5 +1,7 @@
 package com.red.server.media
 
+import com.red.server.groups.GroupDocument
+import com.red.server.groups.GroupMember
 import com.red.server.stories.StoryDocument
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
@@ -25,6 +27,8 @@ class MediaAccessService(private val mongo: MongoTemplate, private val jdbc: Jdb
             accountId
         ) == true
         if (explicitlyGranted) return
+        val avatarGroup = mongo.findOne(Query(Criteria.where("avatarMediaKey").`is`(key)), GroupDocument::class.java)
+        if (avatarGroup != null && mongo.exists(Query(Criteria.where("id").`is`("${avatarGroup.id}:$accountId")), GroupMember::class.java)) return
 
         val activeStory = mongo.exists(
             Query(Criteria.where("mediaKey").`is`(key)

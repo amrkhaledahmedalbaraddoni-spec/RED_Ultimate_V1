@@ -3,6 +3,7 @@ package com.red.server.messaging
 import com.red.server.auth.repository.UserAccountRepository
 import com.red.server.database.ConversationSequence
 import com.red.server.database.MessageDocument
+import com.red.server.groups.GroupMember
 import com.red.sovereign.proto.RedProtos
 import jakarta.annotation.PostConstruct
 import org.springframework.dao.DuplicateKeyException
@@ -36,6 +37,7 @@ class MessageService(
     fun processIncoming(message: RedProtos.ChatMessage): MessageDocument {
         validate(message)
         enforceNotBlocked(message.senderId, message.receiverId)
+        if (message.type in GROUP_TYPES) enforceGroupMembership(message)
         mongo.findOne(Query(Criteria.where("uuid").`is`(message.id)), MessageDocument::class.java)?.let { existing ->
             require(existing.senderId == message.senderId && existing.receiverId == message.receiverId && existing.conversationId == message.conversationId &&
                 existing.senderDeviceId == message.senderDeviceId && existing.receiverDeviceId == message.receiverDeviceId) {
@@ -113,6 +115,13 @@ class MessageService(
         require(blocked == 0) { "Messaging is not allowed between these identities" }
     }
 
+    private fun enforceGroupMembership(message: RedProtos.ChatMessage) {
+        val sender = users.findByRedId(message.senderId) ?: throw NoSuchElementException("Sender identity not found")
+        val receiver = users.findByRedId(message.receiverId) ?: throw NoSuchElementException("Receiver identity not found")
+        require(mongo.exists(Query(Criteria.where("id").`is`("${message.conversationId}:${sender.id}")), GroupMember::class.java)) { "Sender is not a group member" }
+        require(mongo.exists(Query(Criteria.where("id").`is`("${message.conversationId}:${receiver.id}")), GroupMember::class.java)) { "Receiver is not a group member" }
+    }
+
     private fun nextSequence(conversationId: String): Long {
         val sequence = mongo.findAndModify(
             Query(Criteria.where("id").`is`(conversationId)), Update().inc("sequence", 1),
@@ -128,7 +137,8 @@ class MessageService(
         require(message.receiverId.matches(RED_ID) && message.receiverId != message.senderId) { "Invalid receiver YOUNES ID" }
         require(message.conversationId.length in 8..128) { "Invalid conversation ID" }
         require(message.senderDeviceId in 1..127 && message.receiverDeviceId in 1..127) { "Invalid protocol device ID" }
-        require(message.ciphertextType == 2 || message.ciphertextType == 3) { "Unsupported libsignal ciphertext type" }
+        val allowedCiphertext = if (message.type == "GROUP_MESSAGE") message.ciphertextType == 4 else message.ciphertextType == 2 || message.ciphertextType == 3
+        require(allowedCiphertext) { "Unsupported libsignal ciphertext type for ${message.type}" }
         require(message.payload.size() in 1..1_048_576) { "Encrypted envelope must contain 1 byte to 1 MiB" }
         require(message.type.ifBlank { "TEXT" } in TYPES) { "Unsupported message type" }
     }
@@ -137,6 +147,7 @@ class MessageService(
 
     companion object {
         private val RED_ID = Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
-        private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "VOICE", "FILE", "SYSTEM")
+        private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "VOICE", "FILE", "SYSTEM", "GROUP_KEY_DISTRIBUTION", "GROUP_MESSAGE")
+        private val GROUP_TYPES = setOf("GROUP_KEY_DISTRIBUTION", "GROUP_MESSAGE")
     }
 }

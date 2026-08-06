@@ -18,7 +18,7 @@ class PublicDirectoryController(private val users: UserAccountRepository) {
         require(term.length in 3..32) { "Search query must contain 3-32 characters" }
         val caller = UUID.fromString(authentication.name)
         val matches = if (term.startsWith("RED-", ignoreCase = true)) {
-            listOfNotNull(users.findByRedId(term.uppercase()).takeIf { it.status == AccountStatus.APPROVED })
+            listOfNotNull(users.findByRedId(term.uppercase())).filter { it.status == AccountStatus.APPROVED }
         } else {
             users.findTop20ByStatusAndUsernameContainingIgnoreCaseOrderByUsernameAsc(AccountStatus.APPROVED, term)
         }

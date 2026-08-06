@@ -270,11 +270,14 @@ class RedConnectionService : Service() {
         private const val EXTRA_PAYLOAD = "payload"
         private const val EXTRA_GROUP = "group"
         private const val EXTRA_TEXT = "text"
-        private val ALLOWED_MESSAGE_TYPES = setOf("TEXT", "FILE", "VOICE")
+        private val ALLOWED_MESSAGE_TYPES = setOf("TEXT", "RICH_TEXT", "FILE", "VOICE")
 
         fun start(context: Context) = context.startForegroundService(Intent(context, RedConnectionService::class.java))
         fun sendText(context: Context, targetRedId: String, conversationId: String, text: String) =
             sendPayload(context, targetRedId, conversationId, "TEXT", text.toByteArray(Charsets.UTF_8))
+
+        fun sendRichText(context: Context, targetRedId: String, conversationId: String, message: RichMessage) =
+            sendPayload(context, targetRedId, conversationId, "RICH_TEXT", RichMessage.encode(message))
 
         fun sendPayload(context: Context, targetRedId: String, conversationId: String, type: String, payload: ByteArray) =
             context.startForegroundService(

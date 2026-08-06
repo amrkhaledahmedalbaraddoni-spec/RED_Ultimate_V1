@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Download
@@ -128,6 +129,7 @@ import com.red.sovereign.contacts.DirectoryViewModel
 import com.red.sovereign.contacts.PublicRedProfile
 import com.red.sovereign.core.MessageStore
 import com.red.sovereign.core.RedConnectionService
+import com.red.sovereign.core.RichMessage
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
 import com.red.sovereign.crypto.SafetyQrScanner
@@ -438,6 +440,11 @@ private fun ChatHubScreen(
     var directoryQuery by remember { mutableStateOf("") }
     var reportDetails by remember { mutableStateOf("") }
     var messageText by remember { mutableStateOf("") }
+    var selectedChatMessage by remember { mutableStateOf<DecryptedMessage?>(null) }
+    var replyToMessage by remember { mutableStateOf<DecryptedMessage?>(null) }
+    var editingMessageId by remember { mutableStateOf<String?>(null) }
+    var pendingForwardMessage by remember { mutableStateOf<DecryptedMessage?>(null) }
+    var disappearingDurationMs by remember { mutableStateOf<Long?>(null) }
     var showEmoji by remember { mutableStateOf(false) }
     var create by remember { mutableStateOf(false) }
     var showJoinGroup by remember { mutableStateOf(false) }
@@ -527,7 +534,7 @@ private fun ChatHubScreen(
                 }
             }
             val conversation = remember(account.redId, target) { conversationId(account.redId, target) }
-            val conversationMessages = decrypted.filter { it.conversationId == conversation }
+            val conversationMessages = resolveRichMessages(decrypted.filter { it.conversationId == conversation })
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (target.isBlank()) {
                     val groupIds = groups.groups.map(Group::id).toSet()
@@ -547,7 +554,7 @@ private fun ChatHubScreen(
                 items(conversationMessages, key = { it.id }) { item ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.outgoing) Arrangement.End else Arrangement.Start) {
                         Card(
-                            Modifier.widthIn(max = 320.dp),
+                            Modifier.widthIn(max = 320.dp).clickable { selectedChatMessage = item },
                             colors = CardDefaults.cardColors(containerColor = if (item.outgoing) YounesEmerald.copy(alpha = .82f) else AqyalSurfaceRaised.copy(alpha = .94f)),
                             shape = RoundedCornerShape(
                                 topStart = 20.dp, topEnd = 20.dp,
@@ -560,6 +567,7 @@ private fun ChatHubScreen(
                                 when (item.type) {
                                     "FILE" -> AttachmentMessage(item, attachments)
                                     "VOICE" -> VoiceMessage(item, attachments)
+                                    "RICH_TEXT" -> RichTextMessage(item, conversationMessages)
                                     else -> Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
                                 }
                             }
@@ -568,6 +576,9 @@ private fun ChatHubScreen(
                 }
             }
             if (target.isNotBlank()) {
+            (replyToMessage ?: editingMessageId?.let { id -> conversationMessages.firstOrNull { it.id == id } })?.let { referenced ->
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(if (editingMessageId != null) "تعديل الرسالة" else "رد على رسالة", color = YounesEmerald, style = MaterialTheme.typography.labelMedium); Text(messageDisplayText(referenced), maxLines = 1, overflow = TextOverflow.Ellipsis) }; IconButton({ replyToMessage = null; editingMessageId = null }) { Icon(Icons.Default.Close, "إلغاء") } } }
+            }
             if (showEmoji) EmojiPicker(onEmoji = { messageText += it })
             when (val attachmentState = attachments.state) {
                 is AttachmentState.Working -> Text(attachmentState.message, color = AqyalGold, style = MaterialTheme.typography.bodySmall)
@@ -606,7 +617,13 @@ private fun ChatHubScreen(
                 }
                 OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
                 FilledIconButton({
-                    RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""; showEmoji = false
+                    val rich = RichMessage(
+                        action = if (editingMessageId != null) "EDIT" else "MESSAGE",
+                        text = messageText.trim(), replyTo = replyToMessage?.id, editOf = editingMessageId,
+                        expiresAt = disappearingDurationMs?.let { System.currentTimeMillis() + it }
+                    )
+                    RedConnectionService.sendRichText(context, target, conversation, rich)
+                    messageText = ""; showEmoji = false; replyToMessage = null; editingMessageId = null
                 }, enabled = target.matches(RED_ID_PATTERN) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
             }
             }
@@ -691,6 +708,26 @@ private fun ChatHubScreen(
             } },
             confirmButton = { if (!safetyState.verified) Button(safety::markVerified) { Text("الأرقام متطابقة يدويًا") } else TextButton(safety::close) { Text("تم") } },
             dismissButton = { if (!safetyState.verified) TextButton(safety::close) { Text("إلغاء") } }
+        )
+    }
+    selectedChatMessage?.let { message ->
+        val payload = if (message.type == "RICH_TEXT") RichMessage.decode(message.plaintext) else null
+        AlertDialog(
+            onDismissRequest = { selectedChatMessage = null },
+            title = { Text("خيارات الرسالة") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ replyToMessage = message; selectedChatMessage = null }, Modifier.fillMaxWidth()) { Text("رد") }
+                OutlinedButton({ pendingForwardMessage = message; showDirectory = true; selectedChatMessage = null }, Modifier.fillMaxWidth()) { Text("إعادة توجيه") }
+                if (message.outgoing && message.type == "RICH_TEXT" && payload?.action == "MESSAGE") OutlinedButton({ editingMessageId = message.id; messageText = payload.text; selectedChatMessage = null }, Modifier.fillMaxWidth()) { Text("تعديل") }
+                if (message.outgoing) Button({
+                    RedConnectionService.sendRichText(context, target, message.conversationId, RichMessage(action = "DELETE", deleteOf = message.id))
+                    selectedChatMessage = null
+                }, Modifier.fillMaxWidth()) { Text("حذف لدى الجميع") }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("ساعة" to 3_600_000L, "يوم" to 86_400_000L, "أسبوع" to 604_800_000L).forEach { option -> AssistChip({ disappearingDurationMs = option.second; selectedChatMessage = null }, { Text(option.first) }) }
+                }
+            } },
+            confirmButton = { TextButton({ selectedChatMessage = null }) { Text("إغلاق") } }
         )
     }
     selectedContact?.let { person ->
@@ -793,12 +830,12 @@ private fun ChatHubScreen(
             OutlinedTextField(messageSearchQuery, { messageSearchQuery = it }, Modifier.fillMaxWidth(), label = { Text("كلمة أو عبارة") }, singleLine = true)
             val currentConversation = conversationId(account.redId, target)
             val results = if (messageSearchQuery.length >= 2) localMessages.search(messageSearchQuery).filter { it.conversationId == currentConversation } else emptyList()
-            LazyColumn(Modifier.height(280.dp)) { items(results, key = { it.id }) { result -> Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) { Column(Modifier.padding(10.dp)) { Text(result.plaintext.toString(Charsets.UTF_8), maxLines = 4); Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(result.timestamp)), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall) } } } }
+            LazyColumn(Modifier.height(280.dp)) { items(results, key = { it.id }) { result -> Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) { Column(Modifier.padding(10.dp)) { Text(if (result.type == "RICH_TEXT") RichMessage.decode(result.plaintext)?.text.orEmpty() else result.plaintext.toString(Charsets.UTF_8), maxLines = 4); Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(result.timestamp)), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall) } } } }
         } },
         confirmButton = { TextButton({ showMessageSearch = false; messageSearchQuery = "" }) { Text("إغلاق") } }
     )
     if (showDirectory) AlertDialog(
-        onDismissRequest = { showDirectory = false; directory.clear() },
+        onDismissRequest = { showDirectory = false; pendingForwardMessage = null; directory.clear() },
         title = { Text("أشخاص يونس") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -815,7 +852,14 @@ private fun ChatHubScreen(
                             Card(Modifier.fillMaxWidth()) {
                                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Avatar(person.displayName.take(1)); Column(Modifier.weight(1f).padding(start = 9.dp)) { Text(person.displayName, fontWeight = FontWeight.Bold); Text("@${person.username} · ${person.redId}", color = AqyalCyanGlow, fontSize = 10.sp) }
-                                    TextButton({ target = person.redId; showDirectory = false; directory.clear() }) { Text("محادثة") }
+                                    TextButton({
+                                        val forward = pendingForwardMessage
+                                        if (forward != null) {
+                                            RedConnectionService.sendRichText(context, person.redId, conversationId(account.redId, person.redId), RichMessage(text = messageDisplayText(forward), forwardOf = forward.id))
+                                            pendingForwardMessage = null
+                                        } else target = person.redId
+                                        showDirectory = false; directory.clear()
+                                    }) { Text(if (pendingForwardMessage != null) "توجيه" else "محادثة") }
                                     Button({ directory.request(person) }) { Text("إضافة") }
                                 }
                             }
@@ -825,7 +869,7 @@ private fun ChatHubScreen(
                 }
             }
         },
-        confirmButton = { TextButton({ showDirectory = false; directory.clear() }) { Text("إغلاق") } }
+        confirmButton = { TextButton({ showDirectory = false; pendingForwardMessage = null; directory.clear() }) { Text("إغلاق") } }
     )
     if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة يونس جديدة") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -999,6 +1043,33 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 @Composable private fun CreateOption(icon: ImageVector, title: String, detail: String, enabled: Boolean, click: () -> Unit) = Card(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = click)) { Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = if (enabled) AqyalGold else Color.Gray, modifier = Modifier.size(31.dp)); Column(Modifier.padding(horizontal = 14.dp)) { Text(title, fontWeight = FontWeight.Bold, color = if (enabled) Color.Unspecified else Color.Gray); Text(detail, color = Color.Gray, fontSize = 12.sp) } } }
 
 @Composable private fun EmptyState(icon: ImageVector, title: String, detail: String) = Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = AqyalGold, modifier = Modifier.size(62.dp)); Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, textAlign = TextAlign.Center, color = Color.Gray, modifier = Modifier.padding(top = 8.dp)) }
+private fun resolveRichMessages(source: List<DecryptedMessage>): List<DecryptedMessage> {
+    val visible = linkedMapOf<String, DecryptedMessage>()
+    source.sortedBy(DecryptedMessage::timestamp).forEach { message ->
+        val rich = if (message.type == "RICH_TEXT") RichMessage.decode(message.plaintext) else null
+        when {
+            rich?.action == "DELETE" && rich.deleteOf != null -> visible.remove(rich.deleteOf)
+            rich?.action == "EDIT" && rich.editOf != null -> visible[rich.editOf]?.let { original -> visible[rich.editOf] = original.copy(plaintext = RichMessage.encode(RichMessage(text = rich.text, replyTo = RichMessage.decode(original.plaintext)?.replyTo))) }
+            rich?.expiresAt != null && rich.expiresAt <= System.currentTimeMillis() -> Unit
+            else -> visible[message.id] = message
+        }
+    }
+    return visible.values.toList()
+}
+
+private fun messageDisplayText(message: DecryptedMessage): String =
+    if (message.type == "RICH_TEXT") RichMessage.decode(message.plaintext)?.text.orEmpty() else message.plaintext.toString(Charsets.UTF_8)
+
+@Composable
+private fun RichTextMessage(message: DecryptedMessage, conversation: List<DecryptedMessage>) {
+    val rich = RichMessage.decode(message.plaintext)
+    if (rich == null) { Text("رسالة غير صالحة", color = MaterialTheme.colorScheme.error); return }
+    rich.replyTo?.let { replyId -> conversation.firstOrNull { it.id == replyId }?.let { quoted -> Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .45f))) { Text(messageDisplayText(quoted), Modifier.padding(7.dp), maxLines = 2, style = MaterialTheme.typography.bodySmall) } } }
+    if (rich.forwardOf != null) Text("معاد توجيهها", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(rich.text, color = if (message.outgoing) Color(0xFF001B14) else MaterialTheme.colorScheme.onSurface)
+    rich.expiresAt?.let { Text("رسالة مؤقتة", style = MaterialTheme.typography.labelSmall) }
+}
+
 @Composable
 private fun VoiceWaveform(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {

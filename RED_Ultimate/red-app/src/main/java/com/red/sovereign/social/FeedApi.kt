@@ -19,7 +19,13 @@ class FeedApi(private val client: AuthorizedApiClient) {
     }
 
     suspend fun create(text: String, visibility: String = "LOCAL_YEMEN"): ApiResult<Post> =
-        client.request("POST", "/api/feed/posts", json.encodeToString(CreatePostRequest(text, visibility))).decode { json.decodeFromString<Post>(it) }
+        create(CreatePostRequest(text, visibility))
+
+    suspend fun create(request: CreatePostRequest): ApiResult<Post> =
+        client.request("POST", "/api/feed/posts", json.encodeToString(request)).decode { json.decodeFromString<Post>(it) }
+
+    suspend fun thread(postId: String): ApiResult<List<Post>> =
+        client.request("GET", "/api/feed/posts/$postId/thread").decode { json.decodeFromString<List<Post>>(it) }
 
     suspend fun react(postId: String, type: String, active: Boolean): ApiResult<Post> =
         client.request("POST", "/api/feed/posts/$postId/reactions", json.encodeToString(ReactionRequest(type, active))).decode { json.decodeFromString<Post>(it) }

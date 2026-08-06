@@ -109,6 +109,7 @@ import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.social.FeedState
 import com.red.sovereign.social.FeedViewModel
 import com.red.sovereign.social.Post
+import com.red.sovereign.social.ThreadState
 import com.red.sovereign.stories.Story
 import com.red.sovereign.stories.StoryState
 import com.red.sovereign.stories.StoryViewerState
@@ -207,6 +208,10 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
 @Composable
 private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, stories: StoryViewModel, onCreate: () -> Unit) {
     var filter by remember { mutableIntStateOf(0) }
+    var threadPost by remember { mutableStateOf<Post?>(null) }
+    var quotePost by remember { mutableStateOf<Post?>(null) }
+    var replyText by remember { mutableStateOf("") }
+    var quoteText by remember { mutableStateOf("") }
     val storyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -237,9 +242,42 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
             feed.state == FeedState.Loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }
             feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض RED", (feed.state as FeedState.Error).message) }
             feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
-            else -> items(feed.posts, key = { it.id }) { PostCard(it, account.redId, feed::toggleLike, feed::follow, feed::vote) }
+            else -> items(feed.posts, key = { it.id }) { post -> PostCard(post, account.redId, feed::toggleLike, feed::follow, feed::vote, { threadPost = post; feed.loadThread(post) }, { quotePost = post }) }
         }
         item { Spacer(Modifier.height(12.dp)) }
+    }
+    threadPost?.let { root ->
+        AlertDialog(
+            onDismissRequest = { threadPost = null; replyText = ""; feed.closeThread() },
+            title = { Text("سلسلة RED") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    when (val threadState = feed.threadState) {
+                        ThreadState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally), color = AqyalGold)
+                        is ThreadState.Error -> Text(threadState.message, color = MaterialTheme.colorScheme.error)
+                        else -> LazyColumn(Modifier.height(300.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(feed.threadPosts, key = { it.id }) { item ->
+                                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = if (item.id == root.id) AqyalSurfaceRaised else AqyalSurfaceNavy)) {
+                                    Column(Modifier.padding(12.dp)) { Text("@${item.authorUsername} · ${item.authorRedId}", color = AqyalCyanGlow, fontSize = 10.sp); Text(item.text) }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(replyText, { replyText = it }, Modifier.fillMaxWidth(), placeholder = { Text("اكتب ردًا علنيًا في نبض RED…") }, maxLines = 4)
+                    Button({ feed.reply(root, replyText) { replyText = "" } }, Modifier.fillMaxWidth(), enabled = replyText.isNotBlank() && feed.threadState != ThreadState.Publishing) { Text("إرسال الرد") }
+                }
+            },
+            confirmButton = { TextButton({ threadPost = null; replyText = ""; feed.closeThread() }) { Text("إغلاق") } }
+        )
+    }
+    quotePost?.let { quoted ->
+        AlertDialog(
+            onDismissRequest = { quotePost = null; quoteText = "" },
+            title = { Text("اقتباس منشور @${quoted.authorUsername}") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Card { Text(quoted.text, Modifier.padding(12.dp), color = Color.Gray) }; OutlinedTextField(quoteText, { quoteText = it }, Modifier.fillMaxWidth(), label = { Text("تعليقك") }, maxLines = 5) } },
+            confirmButton = { Button({ feed.quote(quoted, quoteText) { quotePost = null; quoteText = "" } }, enabled = quoteText.isNotBlank() && feed.state != FeedState.Publishing) { Text("نشر الاقتباس") } },
+            dismissButton = { TextButton({ quotePost = null; quoteText = "" }) { Text("إلغاء") } }
+        )
     }
     val viewer = stories.viewer
     if (viewer !is StoryViewerState.Closed) {
@@ -287,7 +325,9 @@ private fun PostCard(
     currentRedId: String,
     onLike: (Post) -> Unit,
     onFollow: (Post) -> Unit,
-    onVote: (Post, String) -> Unit
+    onVote: (Post, String) -> Unit,
+    onThread: () -> Unit,
+    onQuote: () -> Unit
 ) = Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
     Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -299,6 +339,7 @@ private fun PostCard(
             AssistChip({}, { Text(if (post.visibility == "LOCAL_YEMEN") "اليمن" else "عام") }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) })
         }
         Text(post.text, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)
+        post.quotePostId?.let { quotedId -> AssistChip({}, { Text("اقتباس RED · ${quotedId.take(8)}") }, enabled = false, leadingIcon = { Icon(Icons.Default.Repeat, null, Modifier.size(15.dp)) }) }
         post.poll?.let { poll ->
             val totalVotes = poll.options.sumOf { it.votes }.coerceAtLeast(1)
             poll.options.forEach { option ->
@@ -311,8 +352,8 @@ private fun PostCard(
         HorizontalDivider()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
             PostAction(Icons.Default.FavoriteBorder, "${post.reactionCounts["LIKE"] ?: 0}", true) { onLike(post) }
-            PostAction(Icons.Default.Chat, post.replyCount.toString(), false) {}
-            PostAction(Icons.Default.Repeat, post.repostCount.toString(), false) {}
+            PostAction(Icons.Default.Chat, post.replyCount.toString(), true, onThread)
+            PostAction(Icons.Default.Repeat, "اقتباس", true, onQuote)
             PostAction(Icons.Default.Share, "مشاركة", false) {}
         }
     }

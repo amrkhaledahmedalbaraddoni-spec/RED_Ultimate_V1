@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.square.okhttp3)
     implementation(libs.libsignal.android)
+    implementation(libs.google.zxing.core)
     implementation(project(":shared-proto"))
 
     testImplementation("junit:junit:4.13.2")

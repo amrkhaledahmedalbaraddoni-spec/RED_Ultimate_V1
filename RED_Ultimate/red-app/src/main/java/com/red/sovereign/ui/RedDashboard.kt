@@ -105,6 +105,8 @@ import com.red.sovereign.contacts.PublicRedProfile
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
+import com.red.sovereign.crypto.SafetyState
+import com.red.sovereign.crypto.SafetyViewModel
 import com.red.sovereign.groups.GroupState
 import com.red.sovereign.groups.GroupViewModel
 import com.red.sovereign.social.FeedState
@@ -141,6 +143,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     val stories: StoryViewModel = viewModel()
     val groups: GroupViewModel = viewModel()
     val directory: DirectoryViewModel = viewModel()
+    val safety: SafetyViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -172,7 +175,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
                 MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                MainSection.CHATS -> ChatHubScreen(account, groups, directory)
+                MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety)
                 MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
                 MainSection.CREATE -> Unit
@@ -364,7 +367,7 @@ private fun PostCard(
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
-private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel, directory: DirectoryViewModel) {
+private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel, directory: DirectoryViewModel, safety: SafetyViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var target by remember { mutableStateOf("") }
     var showDirectory by remember { mutableStateOf(false) }
@@ -451,6 +454,23 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
             }
         }
     }
+    when (val safetyState = safety.state) {
+        SafetyState.Closed -> Unit
+        is SafetyState.Loading -> AlertDialog(onDismissRequest = safety::close, title = { Text("رمز الأمان") }, text = { Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }, confirmButton = { TextButton(safety::close) { Text("إلغاء") } })
+        is SafetyState.Error -> AlertDialog(onDismissRequest = safety::close, title = { Text("تعذر التحقق") }, text = { Text(safetyState.message) }, confirmButton = { TextButton(safety::close) { Text("إغلاق") } })
+        is SafetyState.Ready -> AlertDialog(
+            onDismissRequest = safety::close,
+            title = { Text(if (safetyState.verified) "تم التحقق من الهوية" else "مقارنة رمز الأمان") },
+            text = { Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Image(safetyState.qr, "QR لرمز الأمان", Modifier.size(240.dp).clip(RoundedCornerShape(12.dp)))
+                Text(safetyState.number, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = AqyalGold)
+                Text("الجهاز ${safetyState.deviceId} · ${safetyState.fingerprint.chunked(8).joinToString(" ")}", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                Text("قارن الرقم أو امسح QR وجهًا لوجه/عبر قناة موثوقة. لا يؤكد يونس الهوية تلقائيًا.", fontSize = 11.sp, textAlign = TextAlign.Center)
+            } },
+            confirmButton = { if (!safetyState.verified) Button(safety::markVerified) { Text("الأرقام متطابقة") } else TextButton(safety::close) { Text("تم") } },
+            dismissButton = { if (!safetyState.verified) TextButton(safety::close) { Text("إلغاء") } }
+        )
+    }
     selectedContact?.let { person ->
         AlertDialog(
             onDismissRequest = { selectedContact = null; reportDetails = "" },
@@ -459,6 +479,7 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("@${person.username}\n${person.redId}", color = AqyalCyanGlow)
                     OutlinedTextField(reportDetails, { reportDetails = it }, Modifier.fillMaxWidth(), label = { Text("تفاصيل بلاغ اختياري") }, maxLines = 4)
+                    OutlinedButton({ safety.open(person.redId); selectedContact = null }, Modifier.fillMaxWidth()) { Text("رمز الأمان والتحقق") }
                     OutlinedButton({ directory.remove(person); selectedContact = null }, Modifier.fillMaxWidth()) { Text("إزالة من الأصدقاء") }
                     OutlinedButton({ directory.report(person, "SPAM", reportDetails); reportDetails = "" }, Modifier.fillMaxWidth()) { Text("إبلاغ عن إزعاج/احتيال") }
                     Button({ directory.block(person); selectedContact = null }, Modifier.fillMaxWidth()) { Text("حظر المستخدم") }

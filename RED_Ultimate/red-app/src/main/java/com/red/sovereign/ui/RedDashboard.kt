@@ -37,7 +37,9 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
@@ -59,6 +61,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -132,19 +135,20 @@ import com.red.sovereign.ui.theme.YounesEmerald
 import java.security.MessageDigest
 
 private enum class MainSection(val label: String, val icon: ImageVector) {
-    FEED("المنشورات", Icons.Default.DynamicFeed),
-    CHATS("المحادثات", Icons.Default.Forum),
-    CREATE("إنشاء", Icons.Default.AddCircle),
+    HOME("الرئيسية", Icons.Default.Home),
+    CHATS("الدردشات", Icons.Default.Forum),
+    GROUPS("المجموعات", Icons.Default.Groups),
     CALLS("المكالمات", Icons.Default.Call),
-    PHONE("الهاتف", Icons.Default.Dialpad)
+    MORE("المزيد", Icons.Default.Menu)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
-    var section by remember { mutableStateOf(MainSection.FEED) }
+    var section by remember { mutableStateOf(MainSection.HOME) }
     var showCreate by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showDinstar by remember { mutableStateOf(false) }
     val feed: FeedViewModel = viewModel()
     val stories: StoryViewModel = viewModel()
     val groups: GroupViewModel = viewModel()
@@ -155,23 +159,21 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
 
     Scaffold(
         containerColor = Color.Transparent,
+        floatingActionButton = {
+            if (section == MainSection.HOME && !showDinstar) FloatingActionButton(
+                onClick = { showCreate = true },
+                containerColor = YounesEmerald,
+                contentColor = Color(0xFF002117)
+            ) { Icon(Icons.Default.Add, "إنشاء محتوى") }
+        },
         bottomBar = {
-            NavigationBar(containerColor = AqyalSurfaceNavy) {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .98f)) {
                 MainSection.entries.forEach { item ->
                     NavigationBarItem(
-                        selected = section == item && item != MainSection.CREATE,
-                        onClick = {
-                            if (item == MainSection.CREATE) showCreate = true
-                            else { section = item; if (item == MainSection.CALLS) callHistory.load() }
-                        },
-                        icon = {
-                            if (item == MainSection.CREATE) {
-                                Box(Modifier.size(52.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) {
-                                    Icon(item.icon, item.label, tint = Color.Black, modifier = Modifier.size(31.dp))
-                                }
-                            } else Icon(item.icon, item.label)
-                        },
-                        label = { Text(item.label, maxLines = 1, fontSize = 10.sp) }
+                        selected = section == item,
+                        onClick = { section = item; showDinstar = false; if (item == MainSection.CALLS) callHistory.load() },
+                        icon = { Icon(item.icon, item.label) },
+                        label = { Text(item.label, maxLines = 1, style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -179,12 +181,13 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
-            when (section) {
-                MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety)
-                MainSection.CALLS -> UnifiedCallsScreen(callHistory)
-                MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
-                MainSection.CREATE -> Unit
+            when {
+                showDinstar -> DinstarPhoneScreen(account, viewModel)
+                section == MainSection.HOME -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
+                section == MainSection.CHATS -> ChatHubScreen(account, groups, directory, safety, showGroups = false)
+                section == MainSection.GROUPS -> ChatHubScreen(account, groups, directory, safety, showGroups = true)
+                section == MainSection.CALLS -> UnifiedCallsScreen(callHistory)
+                else -> MoreScreen(account, onDinstar = { showDinstar = true }, onSettings = { showSettings = true }, onContacts = { section = MainSection.CHATS })
             }
         }
     }
@@ -375,8 +378,14 @@ private fun PostCard(
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
-private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel, directory: DirectoryViewModel, safety: SafetyViewModel) {
-    var tab by remember { mutableIntStateOf(0) }
+private fun ChatHubScreen(
+    account: AuthState.Authenticated,
+    groups: GroupViewModel,
+    directory: DirectoryViewModel,
+    safety: SafetyViewModel,
+    showGroups: Boolean
+) {
+    val tab = if (showGroups) 1 else 0
     var target by remember { mutableStateOf("") }
     var showDirectory by remember { mutableStateOf(false) }
     var selectedContact by remember { mutableStateOf<PublicRedProfile?>(null) }
@@ -399,7 +408,6 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
     var memberRedId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
-        TabRow(tab) { Tab(tab == 0, { tab = 0 }, text = { Text("الخاص") }, icon = { Icon(Icons.Default.Chat, null) }); Tab(tab == 1, { tab = 1 }, text = { Text("المجموعات") }, icon = { Icon(Icons.Default.Groups, null) }) }
         if (tab == 0) Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (directory.requests.isNotEmpty()) {
                 Text("طلبات الصداقة", color = AqyalGold, fontWeight = FontWeight.Bold)
@@ -632,6 +640,44 @@ private fun RoundCallAction(icon: ImageVector, title: String, color: Color, enab
     FilledIconButton({}, Modifier.size(62.dp), enabled = enabled) { Icon(icon, title, tint = if (enabled) color else Color.Gray, modifier = Modifier.size(30.dp)) }
     Text(title, fontSize = 11.sp); if (!enabled) Text("قيد الربط", color = Color.Gray, fontSize = 9.sp)
 }
+
+@Composable
+private fun MoreScreen(account: AuthState.Authenticated, onDinstar: () -> Unit, onSettings: () -> Unit, onContacts: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("مساحة يونس", style = MaterialTheme.typography.headlineMedium)
+        Text("الهوية والخدمات السيادية في مكان واحد", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Avatar(account.username.take(1))
+                Column(Modifier.padding(horizontal = 12.dp)) {
+                    Text(account.username, style = MaterialTheme.typography.titleMedium)
+                    Text("@${account.username} · ${account.redId}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        MoreOption(Icons.Default.SimCard, "الهاتف اليمني", "اتصال صوتي مصرح عبر DINSTAR وشرائح الشبكات اليمنية", AqyalGold, click = onDinstar)
+        MoreOption(Icons.Default.Settings, "الإعدادات والخصوصية", "الهوية والأجهزة والخادم والجلسة", YounesEmerald, click = onSettings)
+        MoreOption(Icons.Default.Contacts, "جهات الاتصال", "الأصدقاء وطلبات التواصل والحظر", AqyalCyanGlow, click = onContacts)
+        MoreOption(Icons.Default.Public, "المجتمعات والقنوات", "قيد التطوير — لن يُعرض كمكتمل قبل اختباره", Color(0xFFA78BFA), enabled = false) { }
+    }
+}
+
+@Composable
+private fun MoreOption(icon: ImageVector, title: String, detail: String, color: Color, enabled: Boolean = true, click: () -> Unit) =
+    Card(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = click)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = color)
+            }
+            Column(Modifier.padding(horizontal = 14.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
 
 @Composable
 private fun DinstarPhoneScreen(account: AuthState.Authenticated, viewModel: AuthViewModel) {

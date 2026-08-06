@@ -20,6 +20,8 @@ import android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat

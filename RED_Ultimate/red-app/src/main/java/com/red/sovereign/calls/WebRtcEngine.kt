@@ -131,7 +131,7 @@ class WebRtcEngine(private val context: Context, private val events: Events) {
         return enumerator.deviceNames.firstNotNullOfOrNull { enumerator.createCapturer(it, null) }
     }
 
-    private fun sdpObserver(setLocal: Boolean = false, after: (() -> Unit)? = null) = object : SdpObserver {
+    private fun sdpObserver(setLocal: Boolean = false, after: (() -> Unit)? = null): SdpObserver = object : SdpObserver {
         override fun onCreateSuccess(description: SessionDescription) {
             if (setLocal) peer?.setLocalDescription(sdpObserver(after = { events.onLocalDescription(description); after?.invoke() }), description)
         }

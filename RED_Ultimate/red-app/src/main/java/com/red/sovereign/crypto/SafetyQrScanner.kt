@@ -52,7 +52,9 @@ fun SafetyQrScanner(onCode: (String) -> Unit, modifier: Modifier = Modifier) {
                     analyzer.setAnalyzer(executor) { image ->
                         try {
                             if (!delivered.get()) decodeQr(image, reader)?.let { code ->
-                                if (delivered.compareAndSet(false, true)) post { onCode(code) }
+                                if (delivered.compareAndSet(false, true)) {
+                                    ContextCompat.getMainExecutor(viewContext).execute { onCode(code) }
+                                }
                             }
                         } finally {
                             image.close()

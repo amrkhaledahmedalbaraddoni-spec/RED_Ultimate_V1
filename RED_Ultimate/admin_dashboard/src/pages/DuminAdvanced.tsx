@@ -15,10 +15,10 @@ const DuminAdvanced: React.FC = () => {
 
     return (
         <div style={{ padding: '24px' }}>
-            <h2>🔴 RED Sovereign Hardware (System B)</h2>
+            <h2>🔴 YOUNES Sovereign Hardware (System B)</h2>
             <Row gutter={16}>
                 <Col span={8}>
-                    <Card title="GSM RED">
+                    <Card title="GSM يونس">
                         <Progress type="dashboard" percent={hwData?.signal || 0} strokeColor="#f57c00" />
                         <div style={{ textAlign: 'center' }}>Operator: {hwData?.operator || 'Searching...'}</div>
                     </Card>

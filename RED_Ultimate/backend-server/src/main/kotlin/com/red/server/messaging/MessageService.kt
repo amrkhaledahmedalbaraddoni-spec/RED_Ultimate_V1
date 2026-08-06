@@ -124,8 +124,8 @@ class MessageService(
     private fun validate(message: RedProtos.ChatMessage) {
         val id = runCatching { UUID.fromString(message.id) }.getOrElse { throw IllegalArgumentException("Message ID must be UUID v7") }
         require(id.version() == 7) { "Message ID must be UUID v7" }
-        require(message.senderId.matches(RED_ID)) { "Invalid sender RED ID" }
-        require(message.receiverId.matches(RED_ID) && message.receiverId != message.senderId) { "Invalid receiver RED ID" }
+        require(message.senderId.matches(RED_ID)) { "Invalid sender YOUNES ID" }
+        require(message.receiverId.matches(RED_ID) && message.receiverId != message.senderId) { "Invalid receiver YOUNES ID" }
         require(message.conversationId.length in 8..128) { "Invalid conversation ID" }
         require(message.senderDeviceId in 1..127 && message.receiverDeviceId in 1..127) { "Invalid protocol device ID" }
         require(message.ciphertextType == 2 || message.ciphertextType == 3) { "Unsupported libsignal ciphertext type" }
@@ -136,7 +136,7 @@ class MessageService(
     private fun rank(status: String) = when (status) { "SENT" -> 1; "DELIVERED" -> 2; "READ" -> 3; else -> 0 }
 
     companion object {
-        private val RED_ID = Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
+        private val RED_ID = Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
         private val TYPES = setOf("TEXT", "IMAGE", "VIDEO", "AUDIO", "FILE", "SYSTEM")
     }
 }

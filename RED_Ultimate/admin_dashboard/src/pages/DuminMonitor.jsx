@@ -24,7 +24,7 @@ const DuminMonitor = () => {
                 </Col>
                 <Col span={8}>
                     <Card>
-                        <Statistic title="RED Strength" value={duminState.signal} suffix="/ 100" prefix={<REDFilled />} />
+                        <Statistic title="YOUNES Strength" value={duminState.signal} suffix="/ 100" prefix={<REDFilled />} />
                         <Progress percent={duminState.signal} status="active" strokeColor="#f57c00" />
                     </Card>
                 </Col>

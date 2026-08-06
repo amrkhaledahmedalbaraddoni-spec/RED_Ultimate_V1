@@ -16,9 +16,9 @@ class RedIdGenerator(private val users: UserAccountRepository) {
                 append('-')
                 repeat(4) { append(alphabet[random.nextInt(alphabet.length)]) }
             }
-            val redId = "RED-$value"
+            val redId = "YNS-$value"
             if (!users.existsByRedId(redId)) return redId
         }
-        error("Unable to allocate a unique RED ID")
+        error("Unable to allocate a unique YOUNES ID")
     }
 }

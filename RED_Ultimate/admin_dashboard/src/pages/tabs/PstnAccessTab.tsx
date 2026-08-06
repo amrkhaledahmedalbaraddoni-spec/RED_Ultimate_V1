@@ -21,7 +21,7 @@ export default function PstnAccessTab() {
   return <Card title="صلاحيات الاتصال عبر DINSTAR">
     <Typography.Paragraph>لا يحصل أي حساب على رصيد الشريحة تلقائياً. حدد صلاحية وعدداً يومياً لكل مستخدم.</Typography.Paragraph>
     <Table rowKey="id" dataSource={users} columns={[
-      {title:'RED ID', dataIndex:'redId', render:(v:string)=><Typography.Text copyable>{v}</Typography.Text>},
+      {title:'معرّف يونس', dataIndex:'redId', render:(v:string)=><Typography.Text copyable>{v}</Typography.Text>},
       {title:'المستخدم', render:(_:any,u:any)=><>@{u.username}<br/><small>{u.displayName}</small></>},
       {title:'الحالة', dataIndex:'status', render:(v:string)=><Tag color={v==='APPROVED'?'green':'orange'}>{v}</Tag>},
       {title:'الحد اليومي', render:(_:any,u:any)=><InputNumber min={1} max={1000} value={limits[u.id] || 10} onChange={v=>setLimits({...limits,[u.id]:v || 10})} disabled={u.status!=='APPROVED'} />},

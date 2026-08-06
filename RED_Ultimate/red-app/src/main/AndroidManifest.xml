@@ -12,8 +12,8 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="${usesCleartext}"
-        android:theme="@style/Theme.RED"
-        android:label="RED"
+        android:theme="@style/Theme.Younes"
+        android:label="يونس"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
         <service

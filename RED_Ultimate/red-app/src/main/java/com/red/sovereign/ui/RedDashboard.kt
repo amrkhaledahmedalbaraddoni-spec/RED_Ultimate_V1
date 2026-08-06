@@ -120,7 +120,7 @@ import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalRoyalBlue
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
 import com.red.sovereign.ui.theme.AqyalSurfaceRaised
-import com.red.sovereign.ui.theme.RedCrimson
+import com.red.sovereign.ui.theme.YounesEmerald
 import java.security.MessageDigest
 
 private enum class MainSection(val label: String, val icon: ImageVector) {
@@ -195,12 +195,12 @@ private fun RedTopBar(redId: String, onSettings: () -> Unit) = Row(
     verticalAlignment = Alignment.CenterVertically
 ) {
     Image(
-        painterResource(R.drawable.red_sovereign_icon_master),
-        contentDescription = "RED",
+        painterResource(R.drawable.younes_icon_master),
+        contentDescription = "يونس",
         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)),
         contentScale = ContentScale.Crop
     )
-    Text(" RED", fontSize = 24.sp, color = AqyalGold, fontWeight = FontWeight.Black)
+    Text(" يونس", fontSize = 24.sp, color = AqyalGold, fontWeight = FontWeight.Black)
     Text("  $redId", color = AqyalCyanGlow, fontSize = 11.sp, modifier = Modifier.weight(1f), overflow = TextOverflow.Ellipsis, maxLines = 1)
     IconButton({}, enabled = false) { Icon(Icons.Default.Search, "بحث — قيد الربط") }
     IconButton(onSettings) { Icon(Icons.Default.Settings, "الإعدادات") }
@@ -234,15 +234,15 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
         item {
             Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clickable(onClick = onCreate), colors = CardDefaults.cardColors(containerColor = AqyalSurfaceNavy)) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Avatar("أ"); Text("ماذا يحدث في RED؟", color = Color.LightGray, modifier = Modifier.weight(1f).padding(horizontal = 12.dp)); Icon(Icons.Default.Add, null, tint = AqyalGold)
+                    Avatar("أ"); Text("ماذا يحدث في يونس؟", color = Color.LightGray, modifier = Modifier.weight(1f).padding(horizontal = 12.dp)); Icon(Icons.Default.Add, null, tint = AqyalGold)
                 }
             }
         }
         if (feed.state is FeedState.Message) item { Text((feed.state as FeedState.Message).text, color = AqyalGold, modifier = Modifier.padding(horizontal = 18.dp)) }
         when {
             feed.state == FeedState.Loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) } }
-            feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض RED", (feed.state as FeedState.Error).message) }
-            feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع RED", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
+            feed.state is FeedState.Error -> item { EmptyState(Icons.Default.DynamicFeed, "تعذر تحميل نبض يونس", (feed.state as FeedState.Error).message) }
+            feed.posts.isEmpty() -> item { EmptyState(Icons.Default.DynamicFeed, "ابدأ مجتمع يونس", "اكتب أول منشور محلي. النظام يدعم السلاسل والاقتباسات والاستطلاعات، بينما المحتوى الخاص ينتظر تشفير E2EE.") }
             else -> items(feed.posts, key = { it.id }) { post -> PostCard(post, account.redId, feed::toggleLike, feed::follow, feed::vote, { threadPost = post; feed.loadThread(post) }, { quotePost = post }) }
         }
         item { Spacer(Modifier.height(12.dp)) }
@@ -250,7 +250,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
     threadPost?.let { root ->
         AlertDialog(
             onDismissRequest = { threadPost = null; replyText = ""; feed.closeThread() },
-            title = { Text("سلسلة RED") },
+            title = { Text("سلسلة يونس") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     when (val threadState = feed.threadState) {
@@ -264,7 +264,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
                             }
                         }
                     }
-                    OutlinedTextField(replyText, { replyText = it }, Modifier.fillMaxWidth(), placeholder = { Text("اكتب ردًا علنيًا في نبض RED…") }, maxLines = 4)
+                    OutlinedTextField(replyText, { replyText = it }, Modifier.fillMaxWidth(), placeholder = { Text("اكتب ردًا علنيًا في نبض يونس…") }, maxLines = 4)
                     Button({ feed.reply(root, replyText) { replyText = "" } }, Modifier.fillMaxWidth(), enabled = replyText.isNotBlank() && feed.threadState != ThreadState.Publishing) { Text("إرسال الرد") }
                 }
             },
@@ -296,7 +296,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     when (viewer) {
                         is StoryViewerState.Loading -> Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) }
-                        is StoryViewerState.Image -> Image(viewer.image, story.caption ?: "حالة RED", Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Fit)
+                        is StoryViewerState.Image -> Image(viewer.image, story.caption ?: "حالة يونس", Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Fit)
                         is StoryViewerState.Unsupported -> Text(viewer.message, color = Color.Gray)
                         is StoryViewerState.Error -> Text("تعذر عرض الحالة: ${viewer.message}", color = MaterialTheme.colorScheme.error)
                         StoryViewerState.Closed -> Unit
@@ -340,7 +340,7 @@ private fun PostCard(
             AssistChip({}, { Text(if (post.visibility == "LOCAL_YEMEN") "اليمن" else "عام") }, enabled = false, leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(15.dp)) })
         }
         Text(post.text, Modifier.padding(vertical = 14.dp), fontSize = 17.sp)
-        post.quotePostId?.let { quotedId -> AssistChip({}, { Text("اقتباس RED · ${quotedId.take(8)}") }, enabled = false, leadingIcon = { Icon(Icons.Default.Repeat, null, Modifier.size(15.dp)) }) }
+        post.quotePostId?.let { quotedId -> AssistChip({}, { Text("اقتباس يونس · ${quotedId.take(8)}") }, enabled = false, leadingIcon = { Icon(Icons.Default.Repeat, null, Modifier.size(15.dp)) }) }
         post.poll?.let { poll ->
             val totalVotes = poll.options.sumOf { it.votes }.coerceAtLeast(1)
             poll.options.forEach { option ->
@@ -409,7 +409,7 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(target, { target = it.uppercase() }, Modifier.weight(1f), label = { Text("RED ID للطرف الآخر") }, singleLine = true)
+                OutlinedTextField(target, { target = it.uppercase() }, Modifier.weight(1f), label = { Text("معرّف يونس للطرف الآخر") }, singleLine = true)
                 IconButton({ showDirectory = true }) { Icon(Icons.Default.Contacts, "البحث عن أشخاص", tint = AqyalGold) }
             }
             val conversation = remember(account.redId, target) { conversationId(account.redId, target) }
@@ -418,7 +418,7 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.outgoing) Arrangement.End else Arrangement.Start) {
                         Card(
                             Modifier.widthIn(max = 320.dp),
-                            colors = CardDefaults.cardColors(containerColor = if (item.outgoing) RedCrimson.copy(alpha = .82f) else AqyalSurfaceRaised.copy(alpha = .94f)),
+                            colors = CardDefaults.cardColors(containerColor = if (item.outgoing) YounesEmerald.copy(alpha = .82f) else AqyalSurfaceRaised.copy(alpha = .94f)),
                             shape = RoundedCornerShape(
                                 topStart = 20.dp, topEnd = 20.dp,
                                 bottomStart = if (item.outgoing) 20.dp else 5.dp,
@@ -426,8 +426,8 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                             )
                         ) {
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                                Text(if (item.outgoing) "أنت" else item.senderRedId, color = if (item.outgoing) Color.White.copy(alpha = .78f) else AqyalCyanGlow, fontSize = 10.sp)
-                                Text(item.plaintext.toString(Charsets.UTF_8), color = Color.White, fontSize = 16.sp)
+                                Text(if (item.outgoing) "أنت" else item.senderRedId, color = if (item.outgoing) Color(0xB8002018) else AqyalCyanGlow, fontSize = 10.sp)
+                                Text(item.plaintext.toString(Charsets.UTF_8), color = if (item.outgoing) Color(0xFF001B14) else Color.White, fontSize = 16.sp)
                             }
                         }
                     }
@@ -437,7 +437,7 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                 OutlinedTextField(messageText, { messageText = it }, Modifier.weight(1f), placeholder = { Text("رسالة مشفرة…") }, maxLines = 4)
                 FilledIconButton({
                     RedConnectionService.sendText(context, target, conversation, messageText.trim()); messageText = ""
-                }, enabled = target.matches(Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
+                }, enabled = target.matches(Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && messageText.isNotBlank()) { Icon(Icons.Default.Send, "إرسال") }
             }
         } else Column(Modifier.fillMaxSize().padding(14.dp)) {
             Button({ create = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Text(" إنشاء مجموعة") }
@@ -486,8 +486,8 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                         }
                     }
                     if (canManage) {
-                        OutlinedTextField(memberRedId, { memberRedId = it.uppercase() }, Modifier.fillMaxWidth(), label = { Text("إضافة عضو بواسطة RED ID") }, singleLine = true)
-                        Button({ groups.addMember(selectedGroup, memberRedId) { memberRedId = "" } }, Modifier.fillMaxWidth(), enabled = memberRedId.matches(Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && groups.state != GroupState.Saving) { Text("إضافة عضو") }
+                        OutlinedTextField(memberRedId, { memberRedId = it.uppercase() }, Modifier.fillMaxWidth(), label = { Text("إضافة عضو بواسطة معرّف يونس") }, singleLine = true)
+                        Button({ groups.addMember(selectedGroup, memberRedId) { memberRedId = "" } }, Modifier.fillMaxWidth(), enabled = memberRedId.matches(Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && groups.state != GroupState.Saving) { Text("إضافة عضو") }
                     }
                 }
             },
@@ -499,10 +499,10 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
     }
     if (showDirectory) AlertDialog(
         onDismissRequest = { showDirectory = false; directory.clear() },
-        title = { Text("أشخاص RED") },
+        title = { Text("أشخاص يونس") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(directoryQuery, { directoryQuery = it }, Modifier.fillMaxWidth(), label = { Text("username أو RED ID") }, singleLine = true)
+                OutlinedTextField(directoryQuery, { directoryQuery = it }, Modifier.fillMaxWidth(), label = { Text("username أو معرّف يونس") }, singleLine = true)
                 Button({ directory.search(directoryQuery) }, Modifier.fillMaxWidth(), enabled = directoryQuery.trim().length >= 3 && directory.state != DirectoryState.Loading) {
                     Icon(Icons.Default.Search, null); Text(" بحث آمن")
                 }
@@ -527,7 +527,7 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
         },
         confirmButton = { TextButton({ showDirectory = false; directory.clear() }) { Text("إغلاق") } }
     )
-    if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة RED جديدة") },
+    if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة يونس جديدة") },
         text = { OutlinedTextField(name, { name = it }, label = { Text("اسم المجموعة") }, singleLine = true) },
         confirmButton = { Button({ groups.create(name, null) { create = false; name = "" } }, enabled = name.trim().length >= 2 && groups.state != GroupState.Saving) { Text("إنشاء") } },
         dismissButton = { OutlinedButton({ create = false }) { Text("إلغاء") } })
@@ -555,7 +555,7 @@ private fun UnifiedCallsScreen(history: CallHistoryViewModel) {
         when {
             history.loading -> Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) }
             history.error != null -> EmptyState(Icons.Default.History, "تعذر تحميل السجل", history.error.orEmpty())
-            visible.isEmpty() -> EmptyState(Icons.Default.History, "لا توجد مكالمات", "ستظهر هنا كل المكالمات مع شارة توضح مسار RED أو DINSTAR.")
+            visible.isEmpty() -> EmptyState(Icons.Default.History, "لا توجد مكالمات", "ستظهر هنا كل المكالمات مع شارة توضح مسار يونس أو DINSTAR.")
             else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(visible, key = { it.id }) { CallHistoryRow(it) } }
         }
     }
@@ -571,7 +571,7 @@ private fun CallHistoryRow(call: CallHistoryItem) = Card(Modifier.fillMaxWidth()
             Text(call.peerLabel.ifBlank { call.peerId }, fontWeight = FontWeight.Bold)
             Text("${if (call.direction == "OUTGOING") "صادرة" else "واردة"} · ${call.status}", color = if (call.status == "MISSED") Color.Red else Color.Gray, fontSize = 12.sp)
         }
-        AssistChip({}, { Text(if (call.route == "DINSTAR") "DINSTAR صوت" else "RED ${call.type}") }, enabled = false)
+        AssistChip({}, { Text(if (call.route == "DINSTAR") "DINSTAR صوت" else "يونس ${call.type}") }, enabled = false)
     }
 }
 
@@ -632,7 +632,7 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
     var composer by remember { mutableStateOf(false) }; var text by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("إنشاء في RED", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("إنشاء في يونس", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             if (composer) {
                 OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().height(150.dp), placeholder = { Text("اكتب منشوراً، سلسلة، أو فكرة طويلة…") })
                 Button({ if (text.isNotBlank()) onPost(text.trim()) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank() && !publishing) { if (publishing) CircularProgressIndicator(Modifier.size(20.dp)) else Text("نشر محلي") }
@@ -652,7 +652,7 @@ private fun CreateSheet(publishing: Boolean, onDismiss: () -> Unit, onPost: (Str
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun SettingsSheet(account: AuthState.Authenticated, logout: () -> Unit, dismiss: () -> Unit) = ModalBottomSheet(onDismissRequest = dismiss) {
     Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("الإعدادات", fontSize = 25.sp, fontWeight = FontWeight.Bold); FeatureCard("هوية RED", "@${account.username}\n${account.redId}")
+        Text("الإعدادات", fontSize = 25.sp, fontWeight = FontWeight.Bold); FeatureCard("هوية يونس", "@${account.username}\n${account.redId}")
         FeatureCard("الخصوصية", "مفاتيح الهوية داخل Android Keystore · لا رقم هاتف · لا SMS")
         FeatureCard("الخادم", "Local-first عبر الشبكة الداخلية أو WireGuard")
         OutlinedButton(logout, Modifier.fillMaxWidth()) { Text("تسجيل الخروج") }; Spacer(Modifier.height(22.dp))

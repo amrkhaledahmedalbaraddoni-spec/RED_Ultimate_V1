@@ -13,7 +13,7 @@ const UserApproval: React.FC = () => {
             const resp = await apiFetch('/api/admin/users/pending');
             const data = await resp.json();
             setUsers(data);
-        } catch (e) { message.error("RED: Connection to Master Server failed."); }
+        } catch (e) { message.error("YOUNES: Connection to Master Server failed."); }
         setLoading(false);
     };
 

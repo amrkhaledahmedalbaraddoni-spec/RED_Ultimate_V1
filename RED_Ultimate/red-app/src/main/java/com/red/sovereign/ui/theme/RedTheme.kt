@@ -29,8 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.red.sovereign.R
 
-val RedCrimson = Color(0xFFE0002A)
-val RedCrimsonGlow = Color(0xFFFF3158)
+val YounesEmerald = Color(0xFF00C896)
+val YounesEmeraldGlow = Color(0xFF55F2C5)
+val RedCrimson = Color(0xFFE3294F) // security/error accent retained for compatibility
+val RedCrimsonGlow = Color(0xFFFF4F70)
 val AqyalGold = Color(0xFFE8B84A)
 val AqyalGoldLight = Color(0xFFFFD978)
 val AqyalDarkObsidian = Color(0xFF030712)
@@ -41,13 +43,13 @@ val AqyalCyanGlow = Color(0xFF39D4E8)
 val RedMutedText = Color(0xFFA9BBC9)
 
 private val colors = darkColorScheme(
-    primary = RedCrimson,
+    primary = YounesEmerald,
     secondary = AqyalCyanGlow,
     tertiary = AqyalGold,
     background = AqyalDarkObsidian,
     surface = AqyalSurfaceNavy,
     surfaceVariant = AqyalSurfaceRaised,
-    primaryContainer = Color(0xFF590014),
+    primaryContainer = Color(0xFF004D3A),
     secondaryContainer = Color(0xFF073D48),
     tertiaryContainer = Color(0xFF4C3600),
     onPrimary = Color.White,
@@ -79,7 +81,7 @@ private val shapes = Shapes(
 )
 
 @Composable
-fun RedTheme(content: @Composable () -> Unit) = MaterialTheme(
+fun YounesTheme(content: @Composable () -> Unit) = MaterialTheme(
     colorScheme = colors,
     typography = typography,
     shapes = shapes,
@@ -94,7 +96,7 @@ fun SovereignBackground(content: @Composable () -> Unit) {
         initialValue = 0.10f,
         targetValue = 0.24f,
         animationSpec = infiniteRepeatable(tween(5200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "crimson-pulse"
+        label = "younes-emerald-pulse"
     )
     val drift by transition.animateFloat(
         initialValue = 180f,
@@ -105,7 +107,7 @@ fun SovereignBackground(content: @Composable () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(AqyalDarkObsidian)) {
         Image(
-            painter = painterResource(R.drawable.red_sovereign_background),
+            painter = painterResource(R.drawable.younes_background),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -121,7 +123,7 @@ fun SovereignBackground(content: @Composable () -> Unit) {
         Box(
             Modifier.fillMaxSize().background(
                 Brush.radialGradient(
-                    colors = listOf(RedCrimsonGlow.copy(alpha = pulse), Color.Transparent),
+                    colors = listOf(YounesEmeraldGlow.copy(alpha = pulse), Color.Transparent),
                     center = Offset(1050f, drift),
                     radius = 880f
                 )

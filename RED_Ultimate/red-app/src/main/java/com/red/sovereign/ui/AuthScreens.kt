@@ -63,7 +63,7 @@ import com.red.sovereign.auth.ServerState
 import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
-import com.red.sovereign.ui.theme.RedCrimson
+import com.red.sovereign.ui.theme.YounesEmerald
 
 @Composable
 fun AuthFlow(viewModel: AuthViewModel) {
@@ -75,7 +75,7 @@ fun AuthFlow(viewModel: AuthViewModel) {
         AuthState.Recovery -> RecoveryScreen(viewModel::recover, viewModel::showLogin)
         AuthState.RecoveryComplete -> StatusScreen("تم تغيير كلمة المرور", "أُلغيت كل الجلسات القديمة. يمكنك تسجيل الدخول الآن.", viewModel::showLogin)
         is AuthState.Pending -> PendingScreen(state, viewModel::checkApproval, viewModel::showLogin)
-        is AuthState.Rejected -> StatusScreen("تم رفض الطلب", state.reason ?: "راجع مسؤول منظومة RED المحلية", viewModel::showLogin)
+        is AuthState.Rejected -> StatusScreen("تم رفض الطلب", state.reason ?: "راجع مسؤول منظومة يونس المحلية", viewModel::showLogin)
         AuthState.Suspended -> StatusScreen("الحساب موقوف", "تواصل مع المسؤول المحلي", viewModel::showLogin)
         AuthState.Banned -> StatusScreen("الحساب محظور", "تم إلغاء صلاحية الحساب والأجهزة", viewModel::showLogin)
         is AuthState.Error -> StatusScreen("تعذر إكمال العملية", state.message, viewModel::showWelcome)
@@ -83,20 +83,20 @@ fun AuthFlow(viewModel: AuthViewModel) {
     }
 }
 
-@Composable private fun LoadingScreen() = Centered { CircularProgressIndicator(color = AqyalGold); Spacer(Modifier.height(16.dp)); Text("جارٍ الاتصال بخادم RED المحلي…") }
+@Composable private fun LoadingScreen() = Centered { CircularProgressIndicator(color = AqyalGold); Spacer(Modifier.height(16.dp)); Text("جارٍ الاتصال بخادم يونس المحلي…") }
 
 @Composable
 private fun WelcomeScreen(server: ServerState, discover: () -> Unit, register: () -> Unit, login: () -> Unit) = Centered {
     BrandMark(126)
     Spacer(Modifier.height(18.dp))
-    Text("RED", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+    Text("يونس", style = MaterialTheme.typography.headlineLarge, color = Color.White)
     Text("تواصل سيادي. هوية مستقلة. دون رقم هاتف.", color = AqyalCyanGlow, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-    Text("محادثات · نبض محلي · مكالمات RED", color = AqyalGold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    Text("محادثات · نبض محلي · مكالمات يونس", color = AqyalGold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     Spacer(Modifier.height(24.dp))
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AqyalSurfaceNavy.copy(alpha = .82f))) {
         Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             when (server) {
-                ServerState.Discovering -> { CircularProgressIndicator(Modifier.size(22.dp), color = AqyalCyanGlow); Text("جارٍ التحقق من شبكة RED المحلية…", fontSize = 12.sp) }
+                ServerState.Discovering -> { CircularProgressIndicator(Modifier.size(22.dp), color = AqyalCyanGlow); Text("جارٍ التحقق من شبكة يونس المحلية…", fontSize = 12.sp) }
                 is ServerState.Ready -> Text("الخادم الآمن: ${server.url}", color = AqyalCyanGlow, fontSize = 11.sp, textAlign = TextAlign.Center)
                 is ServerState.Error -> { Text(server.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, textAlign = TextAlign.Center); Text("الافتراضي: ${server.fallbackUrl}", color = Color.Gray, fontSize = 10.sp) }
             }
@@ -114,7 +114,7 @@ private fun RegisterScreen(submit: (String, String, String) -> Unit, back: () ->
     var name by remember { mutableStateOf("") }; var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
     val valid = name.trim().length >= 2 && username.matches(Regex("^[A-Za-z][A-Za-z0-9_.]{2,31}$")) && password.length >= 10 && password == confirm
-    FormColumn("طلب حساب RED") {
+    FormColumn("طلب حساب يونس") {
         Text("سيبقى الحساب معلقاً حتى موافقة المسؤول. لا نطلب رقم هاتف أو شريحة.", textAlign = TextAlign.Center)
         Field(name, { name = it }, "الاسم الظاهر")
         Field(username, { username = it }, "اسم المستخدم", keyboard = KeyboardOptions(imeAction = ImeAction.Next))
@@ -143,7 +143,7 @@ private fun RecoveryScreen(submit: (String, String, String) -> Unit, back: () ->
     var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
     FormColumn("استعادة محلية") {
         Text("لا نستخدم SMS أو بريداً. أدخل أحد الرموز التي حفظتها عند إنشاء الحساب.", textAlign = TextAlign.Center)
-        Field(redId, { redId = it.uppercase() }, "RED ID")
+        Field(redId, { redId = it.uppercase() }, "معرّف يونس")
         Field(code, { code = it.uppercase() }, "رمز الاستعادة")
         PasswordField(password, { password = it }, "كلمة المرور الجديدة")
         PasswordField(confirm, { confirm = it }, "تأكيد كلمة المرور")
@@ -185,14 +185,14 @@ private fun PendingScreen(state: AuthState.Pending, check: () -> Unit, login: ()
 @Composable
 private fun BrandMark(size: Int) = Box(
     Modifier.size(size.dp)
-        .background(Brush.radialGradient(listOf(RedCrimson.copy(alpha = .35f), Color.Transparent)), CircleShape)
+        .background(Brush.radialGradient(listOf(YounesEmerald.copy(alpha = .35f), Color.Transparent)), CircleShape)
         .border(1.dp, AqyalGold.copy(alpha = .72f), RoundedCornerShape((size / 4).dp))
         .padding(7.dp),
     contentAlignment = Alignment.Center
 ) {
     Image(
-        painterResource(R.drawable.red_sovereign_icon_master),
-        contentDescription = "RED",
+        painterResource(R.drawable.younes_icon_master),
+        contentDescription = "يونس",
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((size / 5).dp)),
         contentScale = ContentScale.Crop
     )

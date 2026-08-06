@@ -22,7 +22,7 @@ const DinstarMonitor = () => {
                                 <MobileOutlined style={{ fontSize: 32, color: slot.status === 'IDLE' ? '#52c41a' : '#f57c00' }} />
                                 <div><Tag color={slot.status === 'IDLE' ? 'green' : 'orange'}>{slot.status}</Tag></div>
                             </div>
-                            <Progress percent={slot.signal} size="small" strokeColor="#f57c00" title="RED" />
+                            <Progress percent={slot.signal} size="small" strokeColor="#f57c00" title="يونس" />
                             <div style={{ marginTop: 8, fontSize: 12 }}>
                                 <b>Operator:</b> {slot.operator}<br/>
                                 <b>Calls Today:</b> {slot.calls}

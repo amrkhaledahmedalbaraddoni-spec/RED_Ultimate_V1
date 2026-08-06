@@ -37,13 +37,13 @@ export default function AuthorityTab() {
 
   const approve = (user: PendingUser) => Modal.confirm({
     title: `الموافقة على ${user.displayName}`,
-    content: `سيتم اعتماد ${user.redId} وتوقيع ${user.devices.length} جهاز/أجهزة بمفتاح سلطة RED.`,
+    content: `سيتم اعتماد ${user.redId} وتوقيع ${user.devices.length} جهاز/أجهزة بمفتاح سلطة يونس.`,
     okText: 'موافقة وتوقيع', cancelText: 'إلغاء',
     onOk: () => action(user, 'APPROVED').catch(e => message.error(e.message))
   });
 
   const columns: any[] = [
-    { title: 'RED ID', dataIndex: 'redId', width: 160, render: (v: string) => <Typography.Text copyable>{v}</Typography.Text> },
+    { title: 'معرّف يونس', dataIndex: 'redId', width: 160, render: (v: string) => <Typography.Text copyable>{v}</Typography.Text> },
     { title: 'المستخدم', render: (_: any, u: PendingUser) => <><b>{u.displayName}</b><br/><span style={{color:'#888'}}>@{u.username}</span></> },
     { title: 'التسجيل', dataIndex: 'createdAt', render: (v: string) => new Date(v).toLocaleString('ar') },
     { title: 'الأجهزة', dataIndex: 'devices', render: (devices: Device[]) => <Space direction="vertical">{devices.map(d => <Tag key={d.id} icon={<SafetyCertificateOutlined />} color="gold">{d.deviceName} · {d.platform} · {d.status}</Tag>)}</Space> },
@@ -54,7 +54,7 @@ export default function AuthorityTab() {
     </Space> }
   ];
 
-  return <Card title="سلطة اعتماد حسابات RED" extra={<Button onClick={fetchPending}>تحديث</Button>}>
+  return <Card title="سلطة اعتماد حسابات يونس" extra={<Button onClick={fetchPending}>تحديث</Button>}>
     <Table dataSource={users} columns={columns} rowKey="id" loading={loading} scroll={{x: 1050}}
       expandable={{ expandedRowRender: u => <Descriptions bordered size="small" column={1}>
         {u.devices.map(d => <Descriptions.Item key={d.id} label={`${d.deviceName} — بصمة مفتاح الهوية`}><Typography.Text copyable code>{d.identityFingerprint}</Typography.Text></Descriptions.Item>)}

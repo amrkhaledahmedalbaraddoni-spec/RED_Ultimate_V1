@@ -100,7 +100,7 @@ class RedConnectionService : Service() {
                 connected = true
                 attempts = 0
                 reconnectTask?.cancel(false)
-                notifyConnection("متصل بخادم RED المحلي")
+                notifyConnection("متصل بخادم يونس المحلي")
                 scope.launch {
                     when (val stock = signal.replenishPreKeys()) {
                         is ApiResult.Success -> if (stock.value.ecAvailable < stock.value.minimumRecommended || stock.value.kyberAvailable < stock.value.minimumRecommended) {
@@ -111,7 +111,7 @@ class RedConnectionService : Service() {
                 }
                 drainSends()
             }
-            ConnectionState.CONNECTING -> notifyConnection("جارٍ الاتصال بخادم RED المحلي")
+            ConnectionState.CONNECTING -> notifyConnection("جارٍ الاتصال بخادم يونس المحلي")
             ConnectionState.DISCONNECTED -> { connected = false; scheduleReconnect() }
             ConnectionState.UNAUTHORIZED -> { connected = false; refreshAndReconnect() }
         }
@@ -122,7 +122,7 @@ class RedConnectionService : Service() {
         scope.launch {
             when (val result = AuthApi().refresh(refresh)) {
                 is ApiResult.Success -> { tokenStore.updateTokens(result.value); attempts = 0; socket.connect() }
-                is ApiResult.Error -> { notifyConnection("انتهت الجلسة — افتح RED لتسجيل الدخول"); stopSelf() }
+                is ApiResult.Error -> { notifyConnection("انتهت الجلسة — افتح يونس لتسجيل الدخول"); stopSelf() }
             }
         }
     }
@@ -161,7 +161,7 @@ class RedConnectionService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(sender.hashCode(), NotificationCompat.Builder(this, MESSAGE_CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
-            .setContentTitle("رسالة RED جديدة")
+            .setContentTitle("رسالة يونس جديدة")
             .setContentText("رسالة مشفرة من $sender")
             .setContentIntent(openAppIntent())
             .setAutoCancel(true)
@@ -170,7 +170,7 @@ class RedConnectionService : Service() {
 
     private fun connectionNotification(text: String) = NotificationCompat.Builder(this, CONNECTION_CHANNEL)
         .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-        .setContentTitle("RED — الاتصال السيادي")
+        .setContentTitle("يونس — الاتصال السيادي")
         .setContentText(text)
         .setContentIntent(openAppIntent())
         .setOngoing(true)
@@ -186,8 +186,8 @@ class RedConnectionService : Service() {
 
     private fun createChannels() {
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel(CONNECTION_CHANNEL, "اتصال RED المحلي", NotificationManager.IMPORTANCE_LOW))
-        manager.createNotificationChannel(NotificationChannel(MESSAGE_CHANNEL, "رسائل RED", NotificationManager.IMPORTANCE_HIGH))
+        manager.createNotificationChannel(NotificationChannel(CONNECTION_CHANNEL, "اتصال يونس المحلي", NotificationManager.IMPORTANCE_LOW))
+        manager.createNotificationChannel(NotificationChannel(MESSAGE_CHANNEL, "رسائل يونس", NotificationManager.IMPORTANCE_HIGH))
     }
 
     override fun onDestroy() {

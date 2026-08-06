@@ -10,7 +10,7 @@ export default function MediaTab() {
     <Descriptions bordered column={1}>
       <Descriptions.Item label="محرك الوسائط">mediasoup + WebRTC</Descriptions.Item>
       <Descriptions.Item label="البيانات الحية"><pre>{JSON.stringify(data || {}, null, 2)}</pre></Descriptions.Item>
-      <Descriptions.Item label="ملاحظة">الفيديو يعمل داخل RED عبر WebRTC؛ مسار DINSTAR مخصص للصوت الهاتفي.</Descriptions.Item>
+      <Descriptions.Item label="ملاحظة">الفيديو يعمل داخل يونس عبر WebRTC؛ مسار DINSTAR مخصص للصوت الهاتفي.</Descriptions.Item>
     </Descriptions>
   </Card>;
 }

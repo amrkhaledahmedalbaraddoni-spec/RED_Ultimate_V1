@@ -148,10 +148,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun localize(value: String) = when (value) {
         "INVALID_CREDENTIALS" -> "اسم المستخدم أو كلمة المرور غير صحيحة"
-        "NETWORK_ERROR" -> "تعذر الاتصال بخادم RED المحلي"
-        "INVALID_RECOVERY_CODE" -> "RED ID أو رمز الاستعادة غير صحيح"
+        "NETWORK_ERROR" -> "تعذر الاتصال بخادم يونس المحلي"
+        "INVALID_RECOVERY_CODE" -> "معرّف يونس أو رمز الاستعادة غير صحيح"
         "RATE_LIMITED" -> "محاولات كثيرة؛ انتظر قليلاً ثم أعد المحاولة"
-        "RED_SERVER_NOT_FOUND_ON_LAN" -> "لم يُعثر على خادم RED موثوق في الشبكة المحلية"
+        "RED_SERVER_NOT_FOUND_ON_LAN" -> "لم يُعثر على خادم يونس موثوق في الشبكة المحلية"
         "LAN_DISCOVERY_DISABLED_IN_RELEASE" -> "الاكتشاف التلقائي متاح للنسخة المحلية فقط"
         else -> value
     }

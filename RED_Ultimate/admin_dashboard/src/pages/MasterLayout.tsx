@@ -40,7 +40,7 @@ const MasterLayout: React.FC = () => {
     <Layout style={{ minHeight: '100vh', background: '#000' }}>
       <Sider breakpoint="lg" collapsedWidth="0" theme="dark">
         <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
-          <b style={{ color: '#ff4d4f', fontSize: 18 }}>🔴 RED MASTER</b>
+          <b style={{ color: '#00C896', fontSize: 18 }}>◆ YOUNES MASTER</b>
         </div>
         <Menu theme="dark" mode="inline" defaultSelectedKeys={['1']} items={menuItems} onClick={({key}) => setCurrentTab(key)} />
       </Sider>
@@ -48,7 +48,7 @@ const MasterLayout: React.FC = () => {
         <Header style={{ background: '#0a0a0a', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Space>
              <Tag color="blue">LOCAL MODE</Tag>
-             <Tag color="gold">RED ID AUTHORITY</Tag>
+             <Tag color="gold">YOUNES ID AUTHORITY</Tag>
           </Space>
           <Badge dot={false}><AlertOutlined style={{ color: '#fff', fontSize: 20 }} /></Badge>
         </Header>

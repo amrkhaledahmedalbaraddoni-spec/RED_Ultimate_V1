@@ -34,7 +34,7 @@ class AdminBootstrap(
                 redId = redIdGenerator.next(),
                 username = username.trim().lowercase(),
                 passwordHash = passwordEncoder.encode(password),
-                displayName = "RED Administrator",
+                displayName = "YOUNES Administrator",
                 status = AccountStatus.APPROVED,
                 role = AccountRole.ADMIN
             )

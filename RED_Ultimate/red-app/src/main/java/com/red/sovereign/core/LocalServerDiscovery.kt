@@ -47,7 +47,7 @@ class LocalServerDiscovery(private val context: Context) {
             response.body.string()
         }
         if (!health.contains("\"status\":\"UP\"") && !health.contains("\"status\": \"UP\"")) return null
-        if (!health.contains("1.0.0-RED")) return null
+        if (!health.contains("1.0.0-YOUNES") && !health.contains("1.0.0-RED")) return null
         val authority = client.newCall(Request.Builder().url("$base/api/identity/authority").get().build()).execute().use { response ->
             if (!response.isSuccessful) return null
             response.body.string()

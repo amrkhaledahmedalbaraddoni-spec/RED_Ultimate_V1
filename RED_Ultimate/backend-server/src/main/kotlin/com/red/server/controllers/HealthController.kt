@@ -29,13 +29,15 @@ class HealthController(
         val allOk = mongoOk && redisOk && postgresOk
         
         return mapOf(
+            "brand" to "YOUNES",
+            "displayName" to "يونس",
             "status" to if (allOk) "UP" else "DOWN",
             "services" to mapOf(
                 "mongodb" to if (mongoOk) "UP" else "DOWN",
                 "redis" to if (redisOk) "UP" else "DOWN",
                 "postgresql" to if (postgresOk) "UP" else "DOWN"
             ),
-            "version" to "1.0.0-RED",
+            "version" to "1.0.0-YOUNES",
             "timestamp" to System.currentTimeMillis()
         )
     }

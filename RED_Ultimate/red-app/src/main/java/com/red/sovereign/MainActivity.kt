@@ -17,7 +17,7 @@ import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.ui.AuthFlow
 import com.red.sovereign.ui.RedDashboard
-import com.red.sovereign.ui.theme.RedTheme
+import com.red.sovereign.ui.theme.YounesTheme
 import com.red.sovereign.ui.theme.SovereignBackground
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         setContent {
-            RedTheme {
+            YounesTheme {
                 SovereignBackground {
                     val state = authViewModel.state
                     LaunchedEffect(state is AuthState.Authenticated) {

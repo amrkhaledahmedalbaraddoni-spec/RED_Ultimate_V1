@@ -45,7 +45,7 @@ class DirectoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun search(query: String) = viewModelScope.launch {
         val term = query.trim()
-        if (term.length < 3) { state = DirectoryState.Error("اكتب username كاملًا أو RED ID"); return@launch }
+        if (term.length < 3) { state = DirectoryState.Error("اكتب username كاملًا أو معرّف يونس"); return@launch }
         state = DirectoryState.Loading
         val encoded = URLEncoder.encode(term, "UTF-8")
         when (val response = client.request("GET", "/api/directory/search?query=$encoded")) {

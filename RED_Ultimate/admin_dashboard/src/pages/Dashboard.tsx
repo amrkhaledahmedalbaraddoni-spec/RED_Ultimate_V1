@@ -20,7 +20,7 @@ const Dashboard: React.FC = () => {
 
   if (!stats && !error) return <Spin size="large" style={{display:'block',margin:'100px auto'}}/>;
   if (!stats) return <Alert type="error" message={error} showIcon/>;
-  const chart = { tooltip:{}, xAxis:{type:'category',data:['المستخدمون','الرسائل 24س','ذاكرة JVM %']}, yAxis:{type:'value'}, series:[{type:'bar',data:[stats.active_users||0,stats.messages_24h||0,stats.jvm_memory_percent||0],itemStyle:{color:'#F59E0B'}}] };
+  const chart = { tooltip:{}, xAxis:{type:'category',data:['المستخدمون','الرسائل 24س','ذاكرة JVM %']}, yAxis:{type:'value'}, series:[{type:'bar',data:[stats.active_users||0,stats.messages_24h||0,stats.jvm_memory_percent||0],itemStyle:{color:'#00C896'}}] };
   return <div>
     {error && <Alert type="warning" message={error} showIcon style={{marginBottom:12}}/>}
     <Row gutter={[16,16]}>

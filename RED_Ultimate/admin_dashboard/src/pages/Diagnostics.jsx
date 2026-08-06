@@ -4,7 +4,7 @@ import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-desi
 
 import { apiFetch } from '../api';
 /**
- * RED System Diagnostics
+ * YOUNES System Diagnostics
  * CONNECTED TO REAL BACKEND ENDPOINTS.
  */
 const Diagnostics = () => {
@@ -18,7 +18,7 @@ const Diagnostics = () => {
 
     const runTests = async () => {
         setLoading(true);
-        message.loading('RED: Running Full System Diagnostics...', 1);
+        message.loading('YOUNES: Running Full System Diagnostics...', 1);
         
         try {
             const response = await apiFetch('/api/master/v1/stats/realtime');
@@ -27,13 +27,13 @@ const Diagnostics = () => {
             setResults([
                 { id: 'voip', system: 'System A (VoIP 1080p)', status: data.db_health || 'READY' },
                 { id: 'pstn', system: 'System B (GSM DINSTAR)', status: 'READY' },
-                { id: 'msgs', system: 'System C (RED Messaging)', status: 'READY' },
+                { id: 'msgs', system: 'System C (YOUNES Messaging)', status: 'READY' },
                 { id: 'storage', system: 'MinIO Storage', status: 'READY' }
             ]);
             
-            message.success('RED: Diagnostics completed.');
+            message.success('YOUNES: Diagnostics completed.');
         } catch (error) {
-            message.error('RED: Failed to connect to backend for diagnostics.');
+            message.error('YOUNES: Failed to connect to backend for diagnostics.');
         } finally {
             setLoading(false);
         }
@@ -45,7 +45,7 @@ const Diagnostics = () => {
 
     return (
         <div style={{ padding: '24px' }}>
-            <h1>🔴 RED System Diagnostics</h1>
+            <h1>🔴 YOUNES System Diagnostics</h1>
             <Button type="primary" onClick={runTests} loading={loading} style={{ marginBottom: 20 }}>
                 {loading ? 'Analyzing...' : 'Start Full Audit'}
             </Button>

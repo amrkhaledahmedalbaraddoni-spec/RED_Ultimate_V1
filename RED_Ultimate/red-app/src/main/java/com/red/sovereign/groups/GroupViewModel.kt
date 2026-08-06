@@ -34,11 +34,36 @@ class GroupViewModel(application: Application) : AndroidViewModel(application) {
     fun create(name: String, description: String?, done: () -> Unit) = viewModelScope.launch {
         state = GroupState.Saving
         when (val result = client.request("POST", "/api/groups", json.encodeToString(CreateGroupRequest(name, description)))) {
-            is ApiResult.Success -> runCatching { json.decodeFromString<Group>(result.value) }
-                .onSuccess { groups.add(0, it); state = GroupState.Ready; done() }
-                .onFailure { state = GroupState.Error("INVALID_GROUP_RESPONSE") }
+            is ApiResult.Success -> decodeAndStore(result.value, prepend = true, done)
             is ApiResult.Error -> state = GroupState.Error(result.message)
         }
+    }
+
+    fun addMember(group: Group, redId: String, done: () -> Unit) = viewModelScope.launch {
+        state = GroupState.Saving
+        when (val result = client.request("POST", "/api/groups/${group.id}/members", json.encodeToString(AddGroupMemberRequest(redId.trim().uppercase())))) {
+            is ApiResult.Success -> decodeAndStore(result.value, done = done)
+            is ApiResult.Error -> state = GroupState.Error(result.message)
+        }
+    }
+
+    fun leave(group: Group, done: () -> Unit) = viewModelScope.launch {
+        state = GroupState.Saving
+        when (val result = client.request("DELETE", "/api/groups/${group.id}/membership")) {
+            is ApiResult.Success -> { groups.removeAll { it.id == group.id }; state = GroupState.Ready; done() }
+            is ApiResult.Error -> state = GroupState.Error(result.message)
+        }
+    }
+
+    private fun decodeAndStore(value: String, prepend: Boolean = false, done: () -> Unit) {
+        runCatching { json.decodeFromString<Group>(value) }
+            .onSuccess { updated ->
+                groups.indexOfFirst { it.id == updated.id }.takeIf { it >= 0 }?.let { groups[it] = updated }
+                    ?: if (prepend) groups.add(0, updated) else groups.add(updated)
+                state = GroupState.Ready
+                done()
+            }
+            .onFailure { state = GroupState.Error("INVALID_GROUP_RESPONSE") }
     }
 }
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -98,6 +99,8 @@ import com.red.sovereign.auth.AuthViewModel
 import com.red.sovereign.auth.PstnState
 import com.red.sovereign.calls.CallHistoryItem
 import com.red.sovereign.calls.CallHistoryViewModel
+import com.red.sovereign.contacts.DirectoryState
+import com.red.sovereign.contacts.DirectoryViewModel
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
@@ -114,6 +117,8 @@ import com.red.sovereign.ui.theme.AqyalCyanGlow
 import com.red.sovereign.ui.theme.AqyalGold
 import com.red.sovereign.ui.theme.AqyalRoyalBlue
 import com.red.sovereign.ui.theme.AqyalSurfaceNavy
+import com.red.sovereign.ui.theme.AqyalSurfaceRaised
+import com.red.sovereign.ui.theme.RedCrimson
 import java.security.MessageDigest
 
 private enum class MainSection(val label: String, val icon: ImageVector) {
@@ -133,6 +138,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
     val feed: FeedViewModel = viewModel()
     val stories: StoryViewModel = viewModel()
     val groups: GroupViewModel = viewModel()
+    val directory: DirectoryViewModel = viewModel()
     val callHistory: CallHistoryViewModel = viewModel()
     val createStoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(stories::upload) }
 
@@ -164,7 +170,7 @@ fun RedDashboard(account: AuthState.Authenticated, viewModel: AuthViewModel) {
             RedTopBar(account.redId, onSettings = { showSettings = true })
             when (section) {
                 MainSection.FEED -> FeedScreen(account, feed, stories, onCreate = { showCreate = true })
-                MainSection.CHATS -> ChatHubScreen(account, groups)
+                MainSection.CHATS -> ChatHubScreen(account, groups, directory)
                 MainSection.CALLS -> UnifiedCallsScreen(callHistory)
                 MainSection.PHONE -> DinstarPhoneScreen(account, viewModel)
                 MainSection.CREATE -> Unit
@@ -316,9 +322,11 @@ private fun PostCard(
 @Composable private fun Avatar(text: String) = Box(Modifier.size(42.dp).clip(CircleShape).background(AqyalGold), contentAlignment = Alignment.Center) { Text(text, color = Color.Black, fontWeight = FontWeight.Black) }
 
 @Composable
-private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel) {
+private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewModel, directory: DirectoryViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var target by remember { mutableStateOf("") }
+    var showDirectory by remember { mutableStateOf(false) }
+    var directoryQuery by remember { mutableStateOf("") }
     var messageText by remember { mutableStateOf("") }
     val decrypted = remember { mutableStateListOf<DecryptedMessage>() }
     val context = LocalContext.current
@@ -327,18 +335,35 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
         if (!item.outgoing) RedConnectionService.markRead(context, item.id, item.sequence)
     } }
     var create by remember { mutableStateOf(false) }
+    var selectedGroupId by remember { mutableStateOf<String?>(null) }
+    var memberRedId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         TabRow(tab) { Tab(tab == 0, { tab = 0 }, text = { Text("الخاص") }, icon = { Icon(Icons.Default.Chat, null) }); Tab(tab == 1, { tab = 1 }, text = { Text("المجموعات") }, icon = { Icon(Icons.Default.Groups, null) }) }
         if (tab == 0) Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(target, { target = it.uppercase() }, Modifier.fillMaxWidth(), label = { Text("RED ID للطرف الآخر") }, singleLine = true)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(target, { target = it.uppercase() }, Modifier.weight(1f), label = { Text("RED ID للطرف الآخر") }, singleLine = true)
+                IconButton({ showDirectory = true }) { Icon(Icons.Default.Contacts, "البحث عن أشخاص", tint = AqyalGold) }
+            }
             val conversation = remember(account.redId, target) { conversationId(account.redId, target) }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(decrypted.filter { it.conversationId == conversation }, key = { it.id }) { item ->
-                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), horizontalAlignment = if (item.outgoing) Alignment.End else Alignment.Start) {
-                        Text(if (item.outgoing) "أنت" else item.senderRedId, color = AqyalCyanGlow, fontSize = 11.sp)
-                        Text(item.plaintext.toString(Charsets.UTF_8))
-                    } }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.outgoing) Arrangement.End else Arrangement.Start) {
+                        Card(
+                            Modifier.widthIn(max = 320.dp),
+                            colors = CardDefaults.cardColors(containerColor = if (item.outgoing) RedCrimson.copy(alpha = .82f) else AqyalSurfaceRaised.copy(alpha = .94f)),
+                            shape = RoundedCornerShape(
+                                topStart = 20.dp, topEnd = 20.dp,
+                                bottomStart = if (item.outgoing) 20.dp else 5.dp,
+                                bottomEnd = if (item.outgoing) 5.dp else 20.dp
+                            )
+                        ) {
+                            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                Text(if (item.outgoing) "أنت" else item.senderRedId, color = if (item.outgoing) Color.White.copy(alpha = .78f) else AqyalCyanGlow, fontSize = 10.sp)
+                                Text(item.plaintext.toString(Charsets.UTF_8), color = Color.White, fontSize = 16.sp)
+                            }
+                        }
+                    }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -354,11 +379,68 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                 groups.state is GroupState.Error -> EmptyState(Icons.Default.Groups, "تعذر تحميل المجموعات", (groups.state as GroupState.Error).message)
                 groups.groups.isEmpty() -> EmptyState(Icons.Default.Groups, "لا توجد مجموعات", "أنشئ مجموعة محلية بأدوار مالك ومسؤول وعضو.")
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f).padding(top = 12.dp)) {
-                    items(groups.groups, key = { it.id }) { group -> Card(Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Avatar(group.name.take(1)); Column(Modifier.padding(horizontal = 12.dp)) { Text(group.name, fontWeight = FontWeight.Bold); Text("${group.members.size} أعضاء · ${group.description.orEmpty()}", color = Color.Gray, fontSize = 12.sp) } } } }
+                    items(groups.groups, key = { it.id }) { group -> Card(Modifier.fillMaxWidth().clickable { selectedGroupId = group.id }) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Avatar(group.name.take(1)); Column(Modifier.padding(horizontal = 12.dp)) { Text(group.name, fontWeight = FontWeight.Bold); Text("${group.members.size} أعضاء · ${group.description.orEmpty()}", color = Color.Gray, fontSize = 12.sp) } } } }
                 }
             }
         }
     }
+    val selectedGroup = groups.groups.firstOrNull { it.id == selectedGroupId }
+    if (selectedGroup != null) {
+        val myRole = selectedGroup.members.firstOrNull { it.redId == account.redId }?.role
+        val canManage = myRole == "OWNER" || myRole == "ADMIN"
+        AlertDialog(
+            onDismissRequest = { selectedGroupId = null },
+            title = { Text(selectedGroup.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(selectedGroup.description.orEmpty(), color = Color.Gray)
+                    LazyColumn(Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(selectedGroup.members, key = { it.id }) { member ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Avatar(member.username.take(1)); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) { Text("@${member.username}"); Text(member.redId, color = AqyalCyanGlow, fontSize = 10.sp) }
+                                AssistChip({}, { Text(member.role) }, enabled = false)
+                            }
+                        }
+                    }
+                    if (canManage) {
+                        OutlinedTextField(memberRedId, { memberRedId = it.uppercase() }, Modifier.fillMaxWidth(), label = { Text("إضافة عضو بواسطة RED ID") }, singleLine = true)
+                        Button({ groups.addMember(selectedGroup, memberRedId) { memberRedId = "" } }, Modifier.fillMaxWidth(), enabled = memberRedId.matches(Regex("^RED-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")) && groups.state != GroupState.Saving) { Text("إضافة عضو") }
+                    }
+                }
+            },
+            confirmButton = { TextButton({ selectedGroupId = null }) { Text("إغلاق") } },
+            dismissButton = {
+                if (myRole != "OWNER") TextButton({ groups.leave(selectedGroup) { selectedGroupId = null } }) { Text("مغادرة", color = MaterialTheme.colorScheme.error) }
+            }
+        )
+    }
+    if (showDirectory) AlertDialog(
+        onDismissRequest = { showDirectory = false; directory.clear() },
+        title = { Text("أشخاص RED") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(directoryQuery, { directoryQuery = it }, Modifier.fillMaxWidth(), label = { Text("username أو RED ID") }, singleLine = true)
+                Button({ directory.search(directoryQuery) }, Modifier.fillMaxWidth(), enabled = directoryQuery.trim().length >= 3 && directory.state != DirectoryState.Loading) {
+                    Icon(Icons.Default.Search, null); Text(" بحث آمن")
+                }
+                when (val state = directory.state) {
+                    DirectoryState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally), color = AqyalGold)
+                    is DirectoryState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
+                    DirectoryState.Ready -> if (directory.results.isEmpty()) Text("لا توجد نتائج مطابقة", color = Color.Gray) else LazyColumn(Modifier.height(260.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        items(directory.results, key = { it.redId }) { person ->
+                            Card(Modifier.fillMaxWidth().clickable { target = person.redId; showDirectory = false; directory.clear() }) {
+                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Avatar(person.displayName.take(1)); Column(Modifier.padding(start = 10.dp)) { Text(person.displayName, fontWeight = FontWeight.Bold); Text("@${person.username} · ${person.redId}", color = AqyalCyanGlow, fontSize = 11.sp) }
+                                }
+                            }
+                        }
+                    }
+                    DirectoryState.Idle -> Text("ابحث عن شخص دون مشاركة رقم هاتف أو جهات اتصال الجهاز.", color = Color.Gray, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = { TextButton({ showDirectory = false; directory.clear() }) { Text("إغلاق") } }
+    )
     if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("مجموعة RED جديدة") },
         text = { OutlinedTextField(name, { name = it }, label = { Text("اسم المجموعة") }, singleLine = true) },
         confirmButton = { Button({ groups.create(name, null) { create = false; name = "" } }, enabled = name.trim().length >= 2 && groups.state != GroupState.Saving) { Text("إنشاء") } },

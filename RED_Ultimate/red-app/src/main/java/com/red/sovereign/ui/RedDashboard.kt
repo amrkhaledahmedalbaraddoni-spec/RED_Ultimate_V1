@@ -495,9 +495,7 @@ private fun ChatHubScreen(
                     }
                 }
             }
-            if (showEmoji) LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                items(QUICK_EMOJI) { emoji -> TextButton({ messageText += emoji }) { Text(emoji, fontSize = 22.sp) } }
-            }
+            if (showEmoji) EmojiPicker(onEmoji = { messageText += it })
             when (val attachmentState = attachments.state) {
                 is AttachmentState.Working -> Text(attachmentState.message, color = AqyalGold, style = MaterialTheme.typography.bodySmall)
                 is AttachmentState.Error -> Text("تعذر إكمال المرفق: ${attachmentState.message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -904,8 +902,36 @@ private fun formatBytes(bytes: Long): String = when {
     else -> "$bytes B"
 }
 
+@Composable
+private fun EmojiPicker(onEmoji: (String) -> Unit) {
+    var category by remember { mutableIntStateOf(0) }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(vertical = 6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(horizontal = 8.dp)) {
+                items(EMOJI_CATEGORIES.indices.toList()) { index ->
+                    FilterChip(selected = category == index, onClick = { category = index }, label = { Text(EMOJI_CATEGORIES[index].first) })
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(horizontal = 6.dp)) {
+                items(EMOJI_CATEGORIES[category].second) { emoji ->
+                    TextButton({ onEmoji(emoji) }) { Text(emoji, fontSize = 24.sp) }
+                }
+            }
+        }
+    }
+}
+
 private val RED_ID_PATTERN = Regex("^(RED|YNS)-[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$")
-private val QUICK_EMOJI = listOf("😀", "😂", "😍", "👍", "❤️", "🔥", "👏", "🙏", "🎉", "😢", "😮", "✅")
+private val EMOJI_CATEGORIES = listOf(
+    "سريعة" to listOf("😀", "😂", "😍", "👍", "❤️", "🔥", "👏", "🙏", "🎉", "😢", "😮", "✅"),
+    "الوجوه" to listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🙂", "🙃", "😉", "😊", "🥰", "😍", "🤩", "😘", "😋", "😎", "🤔", "😴", "😭", "😡", "🥳"),
+    "الإشارات" to listOf("👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "👏", "🙌", "🫶", "🤝", "🙏", "💪", "👀", "❤️", "💚", "💛", "💙"),
+    "الأشياء" to listOf("📱", "💻", "⌚", "📷", "🎥", "🎙️", "🔒", "🔑", "💡", "📌", "📎", "📁", "📄", "📚", "🎁", "🏆", "✅", "⚠️"),
+    "الطبيعة" to listOf("🌙", "☀️", "⭐", "🔥", "🌈", "🌹", "🌿", "🌳", "🌊", "⛰️", "🐪", "🦅", "🐝", "🦋"),
+    "الطعام" to listOf("☕", "🍵", "🥤", "🍞", "🥐", "🍚", "🍗", "🥗", "🍎", "🍉", "🍇", "🍯", "🎂"),
+    "السفر" to listOf("🚗", "🚕", "🚌", "✈️", "🚁", "🚢", "🗺️", "🏠", "🏢", "🏥", "🏫", "🕌", "⛺"),
+    "الرموز" to listOf("✅", "❌", "⚠️", "❗", "❓", "💯", "➕", "➖", "♻️", "🔴", "🟢", "🟡", "🔵", "🇾🇪")
+)
 private val ATTACHMENT_JSON = Json { ignoreUnknownKeys = true }
 
 private fun conversationId(first: String, second: String): String {

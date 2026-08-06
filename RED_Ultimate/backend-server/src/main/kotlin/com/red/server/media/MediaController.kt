@@ -16,14 +16,19 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/media")
-class MediaController(private val media: MediaService) {
+class MediaController(private val media: MediaService, private val access: MediaAccessService) {
     @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun upload(@RequestPart("file") file: MultipartFile, authentication: Authentication) =
         media.upload(UUID.fromString(authentication.name), file)
 
     @GetMapping("/users/{userId}/{fileName:.+}")
-    fun download(@PathVariable userId: String, @PathVariable fileName: String): ResponseEntity<StreamingResponseBody> {
+    fun download(
+        @PathVariable userId: String,
+        @PathVariable fileName: String,
+        authentication: Authentication
+    ): ResponseEntity<StreamingResponseBody> {
         val key = "users/$userId/$fileName"
+        access.requireDownloadAllowed(UUID.fromString(authentication.name), key)
         val metadata = media.metadata(key)
         val body = StreamingResponseBody { output -> media.stream(key, output) }
         return ResponseEntity.ok()

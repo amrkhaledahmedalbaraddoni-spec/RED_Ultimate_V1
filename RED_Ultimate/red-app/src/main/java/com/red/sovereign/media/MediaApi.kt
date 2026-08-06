@@ -12,6 +12,8 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okio.BufferedSink
 import okio.source
+import java.io.File
+import java.security.MessageDigest
 
 @Serializable data class MediaObject(val objectKey: String, val mimeType: String, val size: Long, val url: String)
 
@@ -21,6 +23,20 @@ class MediaApi(private val context: Context, private val client: AuthorizedApiCl
     suspend fun download(path: String, maximumBytes: Int = 25 * 1024 * 1024): ApiResult<ByteArray> {
         require(path.startsWith("/api/media/") && !path.contains("..")) { "Invalid authenticated media path" }
         return client.requestBytes(path, maximumBytes)
+    }
+
+    suspend fun downloadToPrivateCache(path: String, extension: String): ApiResult<File> {
+        require(path.startsWith("/api/media/") && !path.contains("..")) { "Invalid authenticated media path" }
+        require(extension.matches(Regex("^[a-z0-9]{2,5}$")))
+        val directory = File(context.cacheDir, "story_media").apply { mkdirs() }
+        val digest = MessageDigest.getInstance("SHA-256").digest(path.toByteArray()).joinToString("") { "%02x".format(it) }
+        val destination = File(directory, "$digest.$extension")
+        if (destination.isFile && destination.length() in 1..100L * 1024 * 1024) return ApiResult.Success(200, destination)
+        return client.requestFile(path, destination)
+    }
+
+    fun clearPrivateCache() {
+        File(context.cacheDir, "story_media").listFiles()?.forEach(File::delete)
     }
 
     suspend fun upload(uri: Uri): ApiResult<MediaObject> {

@@ -9,6 +9,8 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 
 class AuthorizedApiClient(
     private val tokens: TokenStore,
@@ -37,6 +39,19 @@ class AuthorizedApiClient(
             val refresh = tokens.refreshToken ?: return result
             when (val rotated = auth.refresh(refresh)) {
                 is ApiResult.Success -> { tokens.updateTokens(rotated.value); result = executeBytes(path, maximumBytes) }
+                is ApiResult.Error -> return rotated
+            }
+        }
+        return result
+    }
+
+    suspend fun requestFile(path: String, destination: File, maximumBytes: Long = 100L * 1024 * 1024): ApiResult<File> {
+        require(maximumBytes in 1..100L * 1024 * 1024)
+        var result = executeFile(path, destination, maximumBytes)
+        if (result is ApiResult.Error && result.code == 401) {
+            val refresh = tokens.refreshToken ?: return result
+            when (val rotated = auth.refresh(refresh)) {
+                is ApiResult.Success -> { tokens.updateTokens(rotated.value); result = executeFile(path, destination, maximumBytes) }
                 is ApiResult.Error -> return rotated
             }
         }
@@ -92,6 +107,40 @@ class AuthorizedApiClient(
                 else ApiResult.Success(response.code, output.toByteArray())
             }
         }.getOrElse { ApiResult.Error(null, it.message ?: "NETWORK_ERROR") }
+    }
+
+    private suspend fun executeFile(path: String, destination: File, maximumBytes: Long): ApiResult<File> = withContext(Dispatchers.IO) {
+        val token = tokens.accessToken ?: return@withContext ApiResult.Error(401, "UNAUTHORIZED")
+        val partial = File(destination.parentFile, "${destination.name}.part")
+        partial.delete()
+        runCatching {
+            val request = Request.Builder().url(ServerEndpoint.url() + path)
+                .header("Authorization", "Bearer $token").get().build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use ApiResult.Error(response.code, "HTTP_${response.code}")
+                val declared = response.body.contentLength()
+                if (declared > maximumBytes) return@use ApiResult.Error(413, "MEDIA_TOO_LARGE")
+                var total = 0L
+                var tooLarge = false
+                response.body.byteStream().use { input -> FileOutputStream(partial).use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        if (total > maximumBytes) { tooLarge = true; break }
+                        output.write(buffer, 0, read)
+                    }
+                    output.fd.sync()
+                } }
+                if (tooLarge) { partial.delete(); ApiResult.Error(413, "MEDIA_TOO_LARGE") }
+                else {
+                    destination.delete()
+                    if (!partial.renameTo(destination)) { partial.delete(); ApiResult.Error(null, "MEDIA_CACHE_WRITE_FAILED") }
+                    else ApiResult.Success(response.code, destination)
+                }
+            }
+        }.getOrElse { partial.delete(); ApiResult.Error(null, it.message ?: "NETWORK_ERROR") }
     }
 
     private companion object {

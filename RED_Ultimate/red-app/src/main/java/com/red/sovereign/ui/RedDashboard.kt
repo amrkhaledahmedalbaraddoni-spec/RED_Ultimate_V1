@@ -120,6 +120,7 @@ import com.red.sovereign.social.Post
 import com.red.sovereign.social.ThreadState
 import com.red.sovereign.stories.Story
 import com.red.sovereign.stories.StoryState
+import com.red.sovereign.stories.StoryVideoPlayer
 import com.red.sovereign.stories.StoryViewerState
 import com.red.sovereign.stories.StoryViewModel
 import com.red.sovereign.ui.theme.AqyalCyanGlow
@@ -293,6 +294,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
         val story = when (viewer) {
             is StoryViewerState.Loading -> viewer.story
             is StoryViewerState.Image -> viewer.story
+            is StoryViewerState.Video -> viewer.story
             is StoryViewerState.Unsupported -> viewer.story
             is StoryViewerState.Error -> viewer.story
             StoryViewerState.Closed -> error("unreachable")
@@ -305,6 +307,7 @@ private fun FeedScreen(account: AuthState.Authenticated, feed: FeedViewModel, st
                     when (viewer) {
                         is StoryViewerState.Loading -> Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AqyalGold) }
                         is StoryViewerState.Image -> Image(viewer.image, story.caption ?: "حالة يونس", Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Fit)
+                        is StoryViewerState.Video -> StoryVideoPlayer(viewer.uri, Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(14.dp)))
                         is StoryViewerState.Unsupported -> Text(viewer.message, color = Color.Gray)
                         is StoryViewerState.Error -> Text("تعذر عرض الحالة: ${viewer.message}", color = MaterialTheme.colorScheme.error)
                         StoryViewerState.Closed -> Unit

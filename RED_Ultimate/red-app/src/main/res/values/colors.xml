@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="red_launcher_background">#07131F</color>
-    <color name="red_obsidian">#030712</color>
-    <color name="red_crimson">#E0002A</color>
-    <color name="red_yemeni_gold">#E8B84A</color>
+    <color name="younes_launcher_background">#070B1D</color>
+    <color name="younes_obsidian">#030712</color>
+    <color name="younes_emerald">#00C896</color>
+    <color name="younes_yemeni_gold">#E8B84A</color>
 </resources>

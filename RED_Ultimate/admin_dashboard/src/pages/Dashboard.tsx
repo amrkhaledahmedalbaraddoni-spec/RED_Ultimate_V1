@@ -10,10 +10,20 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [monitor, master] = await Promise.all([apiFetch('/api/admin/monitor/stats'), apiFetch('/api/master/v1/stats/realtime')]);
-        if (!monitor.ok || !master.ok) throw new Error('monitor unavailable');
-        setStats({ ...(await monitor.json()), ...(await master.json()) }); setError('');
-      } catch { setError('تعذر قراءة المقاييس الحقيقية من الخادم'); }
+        const [monitor, master] = await Promise.allSettled([
+          apiFetch('/api/admin/monitor/stats'),
+          apiFetch('/api/master/v1/stats/realtime')
+        ]);
+        const merged: Record<string, unknown> = {};
+        const failures: string[] = [];
+        for (const [name, result] of [['monitor', monitor], ['master', master]] as const) {
+          if (result.status === 'rejected') { failures.push(`${name}: network`); continue; }
+          if (!result.value.ok) { failures.push(`${name}: HTTP ${result.value.status}`); continue; }
+          Object.assign(merged, await result.value.json());
+        }
+        if (Object.keys(merged).length > 0) setStats((previous:any) => ({ ...(previous || {}), ...merged }));
+        setError(failures.length ? `بعض مصادر المقاييس غير متاحة (${failures.join('، ')})` : '');
+      } catch (e:any) { setError(`تعذر قراءة المقاييس: ${e?.message || 'خطأ غير معروف'}`); }
     };
     load(); const timer = setInterval(load, 5000); return () => clearInterval(timer);
   }, []);

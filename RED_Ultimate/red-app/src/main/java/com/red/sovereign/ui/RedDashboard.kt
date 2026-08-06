@@ -101,6 +101,7 @@ import com.red.sovereign.calls.CallHistoryItem
 import com.red.sovereign.calls.CallHistoryViewModel
 import com.red.sovereign.contacts.DirectoryState
 import com.red.sovereign.contacts.DirectoryViewModel
+import com.red.sovereign.contacts.PublicRedProfile
 import com.red.sovereign.core.RedConnectionService
 import com.red.sovereign.crypto.DecryptedMessage
 import com.red.sovereign.crypto.DecryptedMessageBus
@@ -367,7 +368,9 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
     var tab by remember { mutableIntStateOf(0) }
     var target by remember { mutableStateOf("") }
     var showDirectory by remember { mutableStateOf(false) }
+    var selectedContact by remember { mutableStateOf<PublicRedProfile?>(null) }
     var directoryQuery by remember { mutableStateOf("") }
+    var reportDetails by remember { mutableStateOf("") }
     var messageText by remember { mutableStateOf("") }
     val decrypted = remember { mutableStateListOf<DecryptedMessage>() }
     val context = LocalContext.current
@@ -382,6 +385,29 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
     Column(Modifier.fillMaxSize()) {
         TabRow(tab) { Tab(tab == 0, { tab = 0 }, text = { Text("الخاص") }, icon = { Icon(Icons.Default.Chat, null) }); Tab(tab == 1, { tab = 1 }, text = { Text("المجموعات") }, icon = { Icon(Icons.Default.Groups, null) }) }
         if (tab == 0) Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (directory.requests.isNotEmpty()) {
+                Text("طلبات الصداقة", color = AqyalGold, fontWeight = FontWeight.Bold)
+                directory.requests.forEach { request ->
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AqyalSurfaceRaised)) {
+                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Avatar(request.requester.displayName.take(1)); Column(Modifier.weight(1f).padding(horizontal = 9.dp)) { Text(request.requester.displayName); Text("@${request.requester.username}", color = AqyalCyanGlow, fontSize = 11.sp) }
+                            TextButton({ directory.resolve(request, false) }) { Text("رفض") }
+                            Button({ directory.resolve(request, true) }) { Text("قبول") }
+                        }
+                    }
+                }
+            }
+            if (directory.contacts.isNotEmpty()) {
+                Text("الأصدقاء", color = AqyalGold, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(directory.contacts, key = { it.redId }) { person ->
+                        Column(Modifier.widthIn(max = 86.dp).clickable { target = person.redId }, horizontalAlignment = Alignment.CenterHorizontally) {
+                            Avatar(person.displayName.take(1)); Text(person.displayName, maxLines = 1, fontSize = 11.sp); Text("@${person.username}", color = AqyalCyanGlow, maxLines = 1, fontSize = 9.sp)
+                            IconButton({ selectedContact = person }, Modifier.size(28.dp)) { Icon(Icons.Default.MoreVert, "إعدادات الصديق", Modifier.size(16.dp)) }
+                        }
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(target, { target = it.uppercase() }, Modifier.weight(1f), label = { Text("RED ID للطرف الآخر") }, singleLine = true)
                 IconButton({ showDirectory = true }) { Icon(Icons.Default.Contacts, "البحث عن أشخاص", tint = AqyalGold) }
@@ -425,6 +451,22 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
             }
         }
     }
+    selectedContact?.let { person ->
+        AlertDialog(
+            onDismissRequest = { selectedContact = null; reportDetails = "" },
+            title = { Text(person.displayName) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("@${person.username}\n${person.redId}", color = AqyalCyanGlow)
+                    OutlinedTextField(reportDetails, { reportDetails = it }, Modifier.fillMaxWidth(), label = { Text("تفاصيل بلاغ اختياري") }, maxLines = 4)
+                    OutlinedButton({ directory.remove(person); selectedContact = null }, Modifier.fillMaxWidth()) { Text("إزالة من الأصدقاء") }
+                    OutlinedButton({ directory.report(person, "SPAM", reportDetails); reportDetails = "" }, Modifier.fillMaxWidth()) { Text("إبلاغ عن إزعاج/احتيال") }
+                    Button({ directory.block(person); selectedContact = null }, Modifier.fillMaxWidth()) { Text("حظر المستخدم") }
+                }
+            },
+            confirmButton = { TextButton({ selectedContact = null; reportDetails = "" }) { Text("إغلاق") } }
+        )
+    }
     val selectedGroup = groups.groups.firstOrNull { it.id == selectedGroupId }
     if (selectedGroup != null) {
         val myRole = selectedGroup.members.firstOrNull { it.redId == account.redId }?.role
@@ -467,11 +509,14 @@ private fun ChatHubScreen(account: AuthState.Authenticated, groups: GroupViewMod
                 when (val state = directory.state) {
                     DirectoryState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally), color = AqyalGold)
                     is DirectoryState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
+                    is DirectoryState.Message -> Text(state.text, color = AqyalGold)
                     DirectoryState.Ready -> if (directory.results.isEmpty()) Text("لا توجد نتائج مطابقة", color = Color.Gray) else LazyColumn(Modifier.height(260.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         items(directory.results, key = { it.redId }) { person ->
-                            Card(Modifier.fillMaxWidth().clickable { target = person.redId; showDirectory = false; directory.clear() }) {
-                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Avatar(person.displayName.take(1)); Column(Modifier.padding(start = 10.dp)) { Text(person.displayName, fontWeight = FontWeight.Bold); Text("@${person.username} · ${person.redId}", color = AqyalCyanGlow, fontSize = 11.sp) }
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Avatar(person.displayName.take(1)); Column(Modifier.weight(1f).padding(start = 9.dp)) { Text(person.displayName, fontWeight = FontWeight.Bold); Text("@${person.username} · ${person.redId}", color = AqyalCyanGlow, fontSize = 10.sp) }
+                                    TextButton({ target = person.redId; showDirectory = false; directory.clear() }) { Text("محادثة") }
+                                    Button({ directory.request(person) }) { Text("إضافة") }
                                 }
                             }
                         }

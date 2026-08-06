@@ -17,6 +17,7 @@ import MessagingTab from './tabs/MessagingTab';
 import SecurityTab from './tabs/SecurityTab';
 import MediaTab from './tabs/MediaTab';
 import InfrastructureTab from './tabs/InfrastructureTab';
+import ModerationTab from './tabs/ModerationTab';
 
 const { Header, Content, Sider } = Layout;
 
@@ -32,6 +33,7 @@ const MasterLayout: React.FC = () => {
     { key: '5', icon: <VideoCameraOutlined />, label: 'Media SFU' },
     { key: '6', icon: <SecurityScanOutlined />, label: 'Sovereign Security' },
     { key: '7', icon: <CloudServerOutlined />, label: 'Infrastructure' },
+    { key: '8', icon: <AlertOutlined />, label: 'Trust & Safety' },
   ];
 
   return (
@@ -58,6 +60,7 @@ const MasterLayout: React.FC = () => {
           {currentTab === '5' && <MediaTab />}
           {currentTab === '6' && <SecurityTab />}
           {currentTab === '7' && <InfrastructureTab />}
+          {currentTab === '8' && <ModerationTab />}
         </Content>
       </Layout>
     </Layout>

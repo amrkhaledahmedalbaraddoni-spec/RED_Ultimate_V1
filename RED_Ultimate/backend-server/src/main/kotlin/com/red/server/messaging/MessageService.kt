@@ -1,5 +1,6 @@
 package com.red.server.messaging
 
+import com.red.server.auth.repository.UserAccountRepository
 import com.red.server.database.ConversationSequence
 import com.red.server.database.MessageDocument
 import com.red.sovereign.proto.RedProtos
@@ -13,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -20,7 +22,9 @@ import java.util.UUID
 @Service
 class MessageService(
     private val mongo: MongoTemplate,
-    private val redis: RedisTemplate<String, String>
+    private val redis: RedisTemplate<String, String>,
+    private val users: UserAccountRepository,
+    private val jdbc: JdbcTemplate
 ) {
     @PostConstruct
     fun indexes() {
@@ -31,6 +35,7 @@ class MessageService(
 
     fun processIncoming(message: RedProtos.ChatMessage): MessageDocument {
         validate(message)
+        enforceNotBlocked(message.senderId, message.receiverId)
         mongo.findOne(Query(Criteria.where("uuid").`is`(message.id)), MessageDocument::class.java)?.let { existing ->
             require(existing.senderId == message.senderId && existing.receiverId == message.receiverId && existing.conversationId == message.conversationId &&
                 existing.senderDeviceId == message.senderDeviceId && existing.receiverDeviceId == message.receiverDeviceId) {
@@ -96,6 +101,17 @@ class MessageService(
         Query(Criteria.where("uuid").`is`(messageId).orOperator(Criteria.where("senderId").`is`(userId), Criteria.where("receiverId").`is`(userId))),
         MessageDocument::class.java
     )
+
+    private fun enforceNotBlocked(senderRedId: String, receiverRedId: String) {
+        val sender = users.findByRedId(senderRedId) ?: throw NoSuchElementException("Sender identity not found")
+        val receiver = users.findByRedId(receiverRedId) ?: throw NoSuchElementException("Receiver identity not found")
+        val blocked = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)",
+            Int::class.java,
+            sender.id, receiver.id, receiver.id, sender.id
+        ) ?: 0
+        require(blocked == 0) { "Messaging is not allowed between these identities" }
+    }
 
     private fun nextSequence(conversationId: String): Long {
         val sequence = mongo.findAndModify(

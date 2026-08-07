@@ -1,147 +1,75 @@
-# RED_Ultimate — التوثيق الكامل للمشروع الرئيسي
+# RED_Ultimate/ — دليل المشروع القانوني
 
-> هذا الملف يشرح المشروع بالكامل. كل مجلد فرعي يحتوي `README.md` خاصًا به يشرح محتواه.
+هذا المجلد يحتوي المنتج والبنية التحتية ومصادر Signal التاريخية. **وجود مجلد لا يعني أنه يدخل البناء**؛ المرجع الحاسم هو [`settings.gradle.kts`](settings.gradle.kts).
 
----
+## graph الحالي
 
-## 🏗️ ما هو هذا المجلد؟
+```text
+:app → red-app/
+:shared-proto → shared-proto/
+included build → build-logic/
 
-هذا هو **قلب مشروع RED_Ultimate** — منظومة مراسلة ومكالمات "سيادية" تعمل محليًا (بدون إنترنت خارجي)، مبنية على **فورك كامل من Signal-Android** (~3,800 ملف مصدري) مع إعادة تسمية شاملة من `org.thoughtcrime.securesms` إلى `com.red.sovereign`.
-
-تطبيق Android باسم **"RED"** — الإصدار `1.0.0-RED` — يحتوي الأنظمة الثلاثة:
-- **System A**: مكالمات VoIP عالية الجودة (WebRTC + Mediasoup SFU)
-- **System B**: مكالمات GSM/PSTN عبر بوابة DINSTAR UC2000 (شرائح يمنية)
-- **System C**: رسائل E2E بتوصيل مضمون (WebSocket + Protobuf + Room)
-
----
-
-## 📁 بنية المجلدات (24 مجلدًا)
-
-### تطبيقات Android (3)
-| المجلد | الوصف |
-|---|---|
-| [`app/`](app/README.md) | **التطبيق الرئيسي** — فورك Signal الكامل + طبقة RED Sovereign (38MB، 2540 ملف Kotlin) |
-| [`android/`](android/README.md) | نسخة بديلة "سيادية" أصغر (Compose + Hilt، ثيم AQYAL الذهبي) — غير مسجلة في البناء |
-| [`app-android/`](app-android/README.md) | نسخة "DevelopedChat" الأقدم مع نظام الموافقة الإدارية — غير مسجلة في البناء |
-
-### الخوادم (2)
-| المجلد | الوصف |
-|---|---|
-| [`backend-server/`](backend-server/README.md) | **الخادم الرئيسي** (Spring Boot 3.4 + Kotlin 2.1، منفذ 8080) — REST + WebSocket + تحكم Dinstar + MongoDB/Postgres/Redis |
-| [`server/`](server/README.md) | خادم مصغّر قديم (SSL 8443، 5 ملفات فقط) |
-
-### لوحات التحكم (2)
-| المجلد | الوصف |
-|---|---|
-| [`admin_dashboard/`](admin_dashboard/README.md) | **اللوحة الكاملة النشطة** (React 19 + Ant Design + ECharts) |
-| [`admin-dashboard/`](admin-dashboard/README.md) | نموذج قديم ثابت (2 ملفات، بيانات Mock) |
-
-### البنية التحتية (5)
-| المجلد | الوصف |
-|---|---|
-| [`media-sfu/`](media-sfu/README.md) | محرك مؤتمرات الفيديو (Mediasoup، منفذ 4000 + RTP 40000-40100) |
-| [`pstn-asterisk/`](pstn-asterisk/README.md) | بوابة الهاتف (Asterisk PBX، SIP 5060 + AMI 5038) |
-| [`infrastructure/`](infrastructure/README.md) | سكربت تهيئة MinIO + PostgreSQL |
-| [`reproducible-builds/`](reproducible-builds/README.md) | بيئة بناء قابلة للتكرار (Docker + apkdiff) |
-| [`wire-handler/`](wire-handler/README.md) | أداة توليد كود Wire المخصصة (build-time plugin) |
-
-### وحدات الكود (7)
-| المجلد | الوصف |
-|---|---|
-| [`core/`](core/README.md) | 7 وحدات أساسية (models, network, ui, util, serialization) |
-| [`lib/`](lib/README.md) | 18 مكتبة Signal أصلية (libsignal-service الأكبر) |
-| [`feature/`](feature/README.md) | 3 وحدات وظيفية (camera, media-send, registration) |
-| [`demo/`](demo/README.md) | 12 تطبيقًا تجريبيًا (غير مضمنة في البناء) |
-| [`shared-proto/`](shared-proto/README.md) | البروتوكول المشترك: ChatProtos + RedProtos |
-| [`gradle/`](gradle/README.md) | نظام البناء (Version Catalogs + Verification) |
-| [`build-logic/`](build-logic/README.md) | البلجنات المخصصة (signal-library, ktlint, licenses...) |
-
-### الجودة والأداء (5)
-| المجلد | الوصف |
-|---|---|
-| [`lintchecks/`](lintchecks/README.md) | فحوصات Android Lint مخصصة (8 كواشف) |
-| [`fast-lint/`](fast-lint/README.md) | مدقق AST سريع (IntelliJ core) |
-| [`benchmark/`](benchmark/README.md) | Macrobenchmark (7 سيناريوهات) |
-| [`microbenchmark/`](microbenchmark/README.md) | قياسات دقيقة لـ libsignal-service |
-| [`baseline-profile/`](baseline-profile/README.md) | تحسين بدء التشغيل |
-
----
-
-## 🏗️ نظام البناء
-
-| المكوّن | الإصدار |
-|---|---|
-| Gradle Wrapper | 9.4.1 |
-| AGP (Android Gradle Plugin) | 9.2.1 |
-| Kotlin | 2.2.20 |
-| Compose BOM | 2026.06.01 |
-| Hilt | 2.52 |
-| libsignal-client | 0.99.1 |
-| compileSdk / minSdk / targetSdk | 37 / 23 / 35 |
-| Java/Kotlin target | 21 |
-
-**الوحدات المسجلة في `settings.gradle.kts`**: `:app`، `:core:*` (7)، `:lib:*` (18)، `:feature:*` (3)، `:lintchecks`، `:fast-lint`، `:build-logic:tools`، `:benchmark`، `:microbenchmark`، `:shared-proto`.
-
-**ملاحظة**: مجلدات `android/` و`app-android/` و`server/` و`backend-server/` و`admin_dashboard/` و`media-sfu/` و`pstn-asterisk/` **غير مسجلة** في بناء Gradle — تعمل كمشاريع مستقلة.
-
----
-
-## 🔗 الملفات الجذرية الهامة
-
-| الملف | الوظيفة |
-|---|---|
-| `docker-compose.yml` | تشغيل المنظومة كلها (10 خدمات) |
-| `settings.gradle.kts` / `build.gradle.kts` | إعداد بناء المشروع |
-| `gradlew` / `gradlew.bat` | مشغّل Gradle |
-| `nginx.conf` | إعدادات الوكيل العكسي |
-| `build-and-run.sh` | بناء وتشغيل Docker دفعة واحدة |
-| `audit_check.py` | فحص اكتمال الأنظمة الثلاثة |
-| `MASTER_GUIDE.md` | دليل ضبط جهاز DINSTAR UC2000 (عربي) |
-| `MASTER_CHECKLIST.txt` | قائمة فحص المشروع |
-| `lefthook.yml` | خطافات git (تنسيق قبل الدفع) |
-| `pkcs11.config` | إعداد التشفير عبر بطاقة ذكية/HSM |
-
----
-
-## ⚠️ الحالة الحالية
-
-وفق التقرير الفني (`TECHNICAL_REPORT_AR.md`):
-- **البنية والهيكل**: سليمة (إعادة تسمية كاملة، 30+ وحدة، نظام إصدارات)
-- **البناء الكامل**: غير مكتمل — فئات مرجعية مفقودة بين الوحدات، أخطاء Manifest
-- **الميزات**: بعضها محاكاة (4K/AV1، التشفير الكمومي، Kill Switch)
-- **الأمان**: `/api/**` مفتوح، JWT غير مفعّل، أسرار افتراضية
-
----
-
-## 🚀 التشغيل
-
-```bash
-# 1) تشغيل المنظومة (خوادم + قاعدة بيانات + لوحة تحكم)
-./build-and-run.sh
-# أو: docker-compose up -d --build
-
-# 2) لوحة التحكم: http://localhost:80
-# 3) الخادم:      http://localhost:8080
+backend-server/ بناء Spring مستقل يضم shared-proto
+admin_dashboard/, media-sfu/, pstn-asterisk/ تبنيها Docker/CI
 ```
 
----
+## المجلدات الأربعة والعشرون
 
-## 📚 وثائق إضافية
-- [`MASTER_GUIDE.md`](MASTER_GUIDE.md) — دليل DINSTAR UC2000
-- [`MASTER_CHECKLIST.txt`](MASTER_CHECKLIST.txt) — قائمة الفحص
-- [`DEPLOY.md`](DEPLOY.md) — خطوات النشر
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — إرشادات المساهمة
+| المجلد | الحالة والدور |
+|---|---|
+| [`red-app/`](red-app/README.md) | تطبيق Android القانوني `:app` |
+| [`backend-server/`](backend-server/README.md) | Backend القانوني |
+| [`shared-proto/`](shared-proto/README.md) | Protobuf الموحد |
+| [`admin_dashboard/`](admin_dashboard/README.md) | لوحة الإدارة القانونية |
+| [`media-sfu/`](media-sfu/README.md) | mediasoup SFU |
+| [`pstn-asterisk/`](pstn-asterisk/README.md) | DINSTAR/Asterisk صوت فقط |
+| [`scripts/`](scripts/README.md) | تشغيل محلي ومفاتيح الهوية |
+| [`gradle/`](gradle/README.md) | Wrapper/catalogs/dependency verification |
+| [`build-logic/`](build-logic/README.md) | منطق وأدوات Gradle |
+| [`wire-handler/`](wire-handler/README.md) | Wire build-time handler |
+| [`app/`](app/README.md) | Signal gold mine خارج البناء |
+| [`android/`](android/README.md) | AQYAL reference خارج البناء |
+| [`app-android/`](app-android/README.md) | DevelopedChat reference خارج البناء |
+| [`core/`](core/README.md) | مكتبات Signal قديمة خارج graph |
+| [`lib/`](lib/README.md) | مكتبات Signal قديمة خارج graph |
+| [`feature/`](feature/README.md) | ميزات Signal قديمة خارج graph |
+| [`demo/`](demo/README.md) | عينات غير منشورة |
+| [`fast-lint/`](fast-lint/README.md) | Lint تاريخي غير مسجل حاليًا |
+| [`lintchecks/`](lintchecks/README.md) | Detectors تاريخية غير مسجلة |
+| [`benchmark/`](benchmark/README.md) | Macrobenchmark تاريخي |
+| [`microbenchmark/`](microbenchmark/README.md) | Microbenchmark تاريخي |
+| [`baseline-profile/`](baseline-profile/README.md) | Profile generator تاريخي |
+| [`reproducible-builds/`](reproducible-builds/README.md) | أدوات مقارنة APK تحتاج مواءمة |
+| [`infrastructure/`](infrastructure/README.md) | أدوات مساعدة؛ Compose هو المرجع |
 
----
+## ملفات التشغيل الأساسية
 
-# (المحتوى الأصلي — README من فورك Signal)
+- `docker-compose.yml`: الخدمات المحلية والـ volumes والشبكة.
+- `nginx.conf`: بوابة HTTP/WebSocket/SFU/admin.
+- `.env.example`: أسماء المتغيرات دون أسرار حقيقية.
+- `LOCAL_FIRST_RUN_AR.md`: تجربة Windows/Linux الأولى.
+- `W0_MODULE_BOUNDARIES.md`: ما هو قانوني وما هو مرجع.
 
-RED is a simple, powerful, and secure messenger that uses your phone's data connection (WiFi/4G/5G) to communicate securely.
+## التوثيقات الشاملة
 
-Millions of people use RED every day for free and instantaneous communication anywhere in the world. Send and receive high-fidelity messages, participate in HD voice/video calls, and explore a growing set of new features that help you stay connected.
+- [`docs/01-PROJECT-OVERVIEW.md`](docs/01-PROJECT-OVERVIEW.md)
+- [`docs/02-DATABASES.md`](docs/02-DATABASES.md)
+- [`docs/03-SERVER-ADMIN-PANEL.md`](docs/03-SERVER-ADMIN-PANEL.md)
+- [`docs/04-APPS.md`](docs/04-APPS.md)
 
-RED's advanced privacy-preserving technology is always enabled, so you can focus on sharing the moments that matter with the people who matter to you.
+## أوامر التحقق
 
-## License
-Copyright 2013 RED Messenger, LLC
-Licensed under the GNU AGPLv3: https://www.gnu.org/licenses/agpl-3.0.html
+```bash
+# Backend + tests
+cd backend-server && gradle clean build
+
+# Android المحلي
+cd .. && ./gradlew :app:assembleDebug \
+  -PRED_SERVER_URL=http://SERVER_IP \
+  --dependency-verification strict
+
+# المنظومة
+./scripts/local-first-run.sh SERVER_IP
+```
+
+على Windows استخدم `scripts/local-first-run.ps1`. لا تحفظ `.env` أو `secrets/` أو artifacts في Git.

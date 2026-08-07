@@ -1,13 +1,21 @@
 {
   "name": "red-media-sfu",
-  "version": "1.0.0",
-  "description": "RED System A - High Performance SFU",
+  "version": "2.0.0-UNIFIED",
+  "private": true,
+  "description": "Unified Sovereign RED WebRTC SFU - Authenticated 4K AV1/VP9/H264 (System A)",
   "main": "server.js",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
   "dependencies": {
-    "mediasoup": "^3.12.0",
-    "ws": "^8.13.0"
+    "mediasoup": "3.24.0",
+    "ws": "8.18.3"
   },
   "scripts": {
-    "start": "node server.js"
-  }
+    "start": "node server.js",
+    "check": "node --check server.js",
+    "health": "node -e \"fetch('http://localhost:4000/health').then(r=>r.json()).then(console.log)\""
+  },
+  "keywords": ["webrtc", "sfu", "mediasoup", "red", "sovereign", "4k", "av1", "vp9", "unified"],
+  "author": "RED Sovereign Engineering © 2026",
+  "license": "AGPL-3.0"
 }

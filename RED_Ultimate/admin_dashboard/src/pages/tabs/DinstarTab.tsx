@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Progress, Tag, Button, Switch, Space, message } from 'antd';
-import { MobileOutlined, REDFilled, ReloadOutlined } from '@ant-design/icons';
+import { MobileOutlined, SignalFilled, ReloadOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../../api';
 const DinstarTab: React.FC = () => {
     const [slots, setSlots] = useState<any[]>([]);
 
     const refresh = async () => {
-        const resp = await fetch('/api/master/v1/hardware/dinstar/slots');
+        const resp = await apiFetch('/api/master/v1/hardware/dinstar/slots');
         if (resp.ok) setSlots(await resp.json());
     };
 
@@ -31,7 +32,7 @@ const DinstarTab: React.FC = () => {
                                 <Tag color={slot.status === 'IDLE' ? 'green' : 'orange'}>{slot.status}</Tag>
                             </Space>
                             <div style={{ marginTop: 16 }}>
-                                <div style={{ color: '#aaa', fontSize: 12 }}>RED Strength: {slot.signal}%</div>
+                                <div style={{ color: '#aaa', fontSize: 12 }}>Signal Strength: {slot.signal}%</div>
                                 <Progress percent={slot.signal} showInfo={false} strokeColor="#f57c00" size="small" />
                             </div>
                             <Button type="link" danger size="small" style={{ padding: 0, marginTop: 10 }}>Restart SIM</Button>

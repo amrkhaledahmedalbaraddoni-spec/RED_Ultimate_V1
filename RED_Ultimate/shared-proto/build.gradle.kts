@@ -1,6 +1,6 @@
 plugins {
     id("java-library")
-    id("com.google.protobuf") version "0.9.4"
+    id("com.google.protobuf") version "0.10.0"
 }
 
 java {
@@ -9,7 +9,7 @@ java {
 }
 
 dependencies {
-    implementation("com.google.protobuf:protobuf-java:3.25.1")
+    api("com.google.protobuf:protobuf-java:3.25.1")
 }
 
 protobuf {

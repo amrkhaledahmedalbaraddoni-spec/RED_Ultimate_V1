@@ -1,52 +1,21 @@
-# `media-sfu/` — محرك مؤتمرات الفيديو (System A)
+# media-sfu/ — خادم وسائط RED
 
-خادم وسائط **Mediasoup (SFU)** — يدير مكالمات الفيديو والصوت بين مستخدمي التطبيق. الجزء المسؤول عن **System A** (VoIP عالي الجودة).
+> **الحالة:** نشط — Node 22/mediasoup
 
----
+## الوظيفة
 
-## 📊 أرقام
+SFU محلي للمكالمات الجماعية والبث والمساحات. يتحقق من JWT ويدير rooms/transports/producers/consumers؛ الإشارة الفردية الأساسية تمر عبر backend. يحتاج announced IP ومنافذ UDP وTURN للاختبار الحقيقي.
 
-| المكوّن | القيمة |
-|---|---|
-| التقنية | Mediasoup 3.12 (WebRTC SFU) + ws 8.13 |
-| المنفذ | **4000** (WebSocket) + **40000–40100/udp** (RTP) |
-| اللغة | Node.js 22 |
-| العمال | 2 Workers (توزيع الغرف Round-Robin) |
+## المحتوى
 
----
+`server.js` الخادم، `package-lock.json` تثبيت حتمي، `Dockerfile` runtime.
 
-## 🧱 الترميزات المدعومة (في `server.js`)
-- `audio/opus` (48kHz، قناتان)
-- `video/VP8`
-- `video/VP9` (profile-id 2)
-- `video/H264` (packetization-mode 1)
+## العلاقة بباقي المشروع
 
-> **ملاحظة**: لا يوجد AV1 في الترميزات الفعلية رغم الادعاءات في ملفات أخرى — الحالي يدعم حتى VP9/H264.
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
 
----
+## التحقق
 
-## 🔌 بروتوكول WebSocket (رسائل JSON)
-
-| الرسالة | الوظيفة |
-|---|---|
-| `join` | إنشاء/الانضمام لغرفة + إنشاء WebRtcTransport + إرجاع rtpCapabilities |
-| `connectTransport` | ربط DTLS |
-| `produce` | بث وسيط (audio/video) + إشعار بقية الأعضاء (`newProducer`) |
-| `consume` | الاشتراك في وسيط نظير آخر |
-| `leave` | تنظيف الموارد |
-
-عند إغلاق الاتصال: تنظيف تلقائي، وحذف الغرفة إذا أصبحت فارغة.
-
----
-
-## 🚀 التشغيل
-```bash
-npm install        # يتطلب أدوات C++ (python3, build-essential)
-node server.js
-# أو عبر Docker: docker-compose up media-sfu
-```
-
-## 🔗 العلاقة
-- يستدعيه التطبيق (System A) للتفاوض على وسائط المكالمات
-- يعمل مع `coturn` (TURN على :3478) لعبور NAT
-- في `docker-compose.yml` مكشوف على 4000 + نطاق UDP
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

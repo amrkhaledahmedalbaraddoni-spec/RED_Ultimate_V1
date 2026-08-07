@@ -1,8 +1,13 @@
 # Dependencies
 node_modules/
+*/node_modules/
 
 # Environment secrets (use .env.example as template)
 .env
+!.env.example
+secrets/
+*.pem
+*.key
 
 # Gradle / Android build outputs
 .gradle/
@@ -20,14 +25,37 @@ captures/
 
 # Logs & OS
 *.log
+logs/
 Thumbs.db
 .DS_Store
 
-# Keystores / signing
+# Keystores / signing (keep debug p12 for local builds)
 *.jks
 *.keystore
+# Allow RED debug keystore for reproducible local builds
+!RED_Ultimate/red-app/signing/red-debug.p12
 
-# Docker volumes / local data
+# Docker volumes / local data and extracted local builds
 minio-data/
 postgres-data/
 mongo-data/
+redis-data/
+prometheus-data/
+grafana-data/
+local-artifacts/
+minio-data/
+postgres-data/
+mongo-data/
+backend-logs/
+sfu-logs/
+nginx-logs/
+asterisk-logs/
+asterisk-spool/
+turn-data/
+mongo-config/
+
+# Build artifacts
+*.apk
+*.aab
+*.zip
+workspace-*.zip

@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Table, Tag, Space, Progress } from 'antd';
 import { MessageOutlined, SendOutlined, ClockCircleOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../../api';
 const MessagingTab: React.FC = () => {
     const [messageStats, setMessageStats] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/master/v1/stats/realtime')
+        apiFetch('/api/master/v1/stats/realtime')
             .then(res => res.json())
             .then(setMessageStats)
             .catch(console.error);

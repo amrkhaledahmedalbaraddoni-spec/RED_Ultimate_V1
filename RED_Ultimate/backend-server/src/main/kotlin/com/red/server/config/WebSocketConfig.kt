@@ -1,41 +1,40 @@
 package com.red.server.config
 
+import com.red.server.auth.security.JwtHandshakeInterceptor
 import com.red.server.websocket.AdminLogHandler
-import com.red.server.websocket.ChatWebSocketHandler
+import com.red.server.websocket.CallWebSocketHandler
 import com.red.server.websocket.RedMasterHandler
-import com.red.server.websocket.RedWebSocketHandler
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.socket.config.annotation.EnableWebSocket
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
-/**
- * WebSocket Configuration — registers all WebSocket handlers at their endpoints.
- */
 @Configuration
 @EnableWebSocket
 class WebSocketConfig(
     private val redMasterHandler: RedMasterHandler,
-    private val chatWebSocketHandler: ChatWebSocketHandler,
-    private val redWebSocketHandler: RedWebSocketHandler,
-    private val adminLogHandler: AdminLogHandler
+    private val callWebSocketHandler: CallWebSocketHandler,
+    private val adminLogHandler: AdminLogHandler,
+    private val jwtHandshakeInterceptor: JwtHandshakeInterceptor,
+    @Value("\${red.security.allowed-origins:http://localhost,http://127.0.0.1}")
+    private val configuredAllowedOrigins: String
 ) : WebSocketConfigurer {
-
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
-        // RED Master Protocol
+        val origins = configuredAllowedOrigins.split(',').map(String::trim).filter(String::isNotEmpty).toTypedArray()
+        require(origins.isNotEmpty() && origins.none { it == "*" }) { "Explicit WebSocket origins are required" }
+        // The only messaging protocol. Android and backend both use RedProtos.RedRED.
         registry.addHandler(redMasterHandler, "/ws/master")
-            .setAllowedOrigins("*")
+            .addInterceptors(jwtHandshakeInterceptor)
+            .setAllowedOriginPatterns(*origins)
 
-        // Chat WebSocket
-        registry.addHandler(chatWebSocketHandler, "/ws/chat")
-            .setAllowedOrigins("*")
+        // WebRTC signaling only; media is handled by WebRTC/mediasoup.
+        registry.addHandler(callWebSocketHandler, "/ws/calls")
+            .addInterceptors(jwtHandshakeInterceptor)
+            .setAllowedOriginPatterns(*origins)
 
-        // RED WebSocket (general)
-        registry.addHandler(redWebSocketHandler, "/ws/red")
-            .setAllowedOrigins("*")
-
-        // Admin Logs WebSocket
         registry.addHandler(adminLogHandler, "/ws/admin/logs")
-            .setAllowedOrigins("*")
+            .addInterceptors(jwtHandshakeInterceptor)
+            .setAllowedOriginPatterns(*origins)
     }
 }

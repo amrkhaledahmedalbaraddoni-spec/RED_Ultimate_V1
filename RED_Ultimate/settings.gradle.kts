@@ -1,65 +1,50 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = "RED-Ultimate"
 
-// ═══════════════════════════════════════════
-//  RED Ultimate - Gradle Settings
-//  Fixed: removed non-existent :features:* modules
-//  All includes verified against existing build files
-// ═══════════════════════════════════════════
-
-// Main app module
+// Canonical RED Android product. The legacy Signal fork remains in app/ as an
+// extraction source only; it is deliberately outside the build graph.
 include(":app")
+project(":app").projectDir = file("red-app")
 
-// Core modules (all verified to have build.gradle.kts)
-include(":core:util")
-include(":core:ui")
-include(":core:models")
-include(":core:models-jvm")
-include(":core:util-jvm")
-include(":core:serialization")
-include(":core:network")
-
-// Lib modules (Signal libraries - all verified)
-include(":lib:libsignal-service")
-include(":lib:network")
-include(":lib:glide")
-include(":lib:archive")
-include(":lib:apng")
-include(":lib:contacts")
-include(":lib:blurhash")
-include(":lib:paging")
-include(":lib:photoview")
-include(":lib:qr")
-include(":lib:video")
-include(":lib:spinner")
-include(":lib:sticky-header-grid")
-include(":lib:debuglogs-viewer")
-include(":lib:device-transfer")
-include(":lib:image-editor")
-include(":lib:donations")
-include(":lib:billing")
-
-// Feature modules (exist in feature/)
-include(":feature:camera")
-include(":feature:media-send")
-include(":feature:registration")
-
-// Lint & build tools
-include(":lintchecks")
-include(":fast-lint")
-include(":build-logic:tools")
-
-// Benchmark modules
-include(":benchmark")
-include(":microbenchmark")
-
-// Shared Protobuf definitions
+// One protocol shared by Android and the backend.
 include(":shared-proto")
+
+// Root QA tasks consume these tools as a composite build. Artifact-only Android builds may skip
+// the heavy QA composite; the full CI image still builds and tests it through its normal stages.
+val skipBuildLogic = providers.gradleProperty("RED_SKIP_BUILD_LOGIC").orNull?.toBooleanStrictOrNull() ?: false
+if (!skipBuildLogic) includeBuild("build-logic")
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        maven {
+            url = uri("$rootDir/local-maven")
+            content { includeGroup("org.signal") }
+            metadataSources { gradleMetadata() }
+        }
+        // libsignal-android is a large AAR. Use two HTTPS front doors for Maven Central;
+        // strict SHA-256 verification still rejects any byte not pinned in metadata.
+        maven {
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2")
+            content { includeGroup("org.signal") }
+        }
+        maven {
+            url = uri("https://repo1.maven.org/maven2")
+            content { includeGroup("org.signal") }
+        }
         mavenCentral()
-        maven { url = uri("https://jitpack.io") }
+    }
+    versionCatalogs {
+        create("benchmarkLibs") { from(files("gradle/benchmark-libs.versions.toml")) }
+        create("testLibs") { from(files("gradle/test-libs.versions.toml")) }
+        create("lintLibs") { from(files("gradle/lint-libs.versions.toml")) }
     }
 }

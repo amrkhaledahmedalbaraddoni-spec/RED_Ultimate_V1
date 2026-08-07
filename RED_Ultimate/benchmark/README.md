@@ -1,42 +1,21 @@
-# `benchmark/` — قياسات أداء التطبيق
+# benchmark/ — Macrobenchmark تاريخي
 
-وحدة **Android Benchmark** (Macrobenchmark) لقياس أداء التطبيق في سيناريوهات حقيقية (بدء التشغيل، المعالجة، البحث) — حزم `org.thoughtcrime.benchmark` (هوية Signal).
+> **الحالة:** غير مدرج حاليًا
 
----
+## الوظيفة
 
-## 📁 المحتوى
+سيناريوهات قياس أداء Android الموروثة. تحتاج إعادة ربط package/applicationId مع `red-app` قبل اعتبار نتائجها صالحة.
 
-```
-benchmark/src/main/
-├── AndroidManifest.xml     ← بدون Activity (وحدة قياس)
-└── java/org/thoughtcrime/benchmark/
-    ├── BenchmarkSetup.kt               ← تهيئة القياس العامة
-    ├── BenchmarkMetrics.kt             ← تعريف المقاييس (Cold Startup, Frames, Memory)
-    ├── StartupBenchmarks.kt            ← ⭐ بدء التشغيل البارد (Cold Start) — الأنسب لتقييم تحسينات
-    ├── ConversationBenchmarks.kt       ← فتح محادثة والتنقل فيها
-    ├── MessageProcessingBenchmarks.kt  ← معالجة الرسائل الواردة
-    ├── GroupMessageProcessingBenchmarks.kt ← معالجة رسائل المجموعات
-    ├── SearchBenchmarks.kt             ← البحث في المحادثات
-    ├── ThreadDeletionBenchmarks.kt     ← حذف المحادثات
-    └── UIDeviceExt.kt                  ← أدوات UI للـ benchmark
-```
+## المحتوى
 
-## 🧪 الاختبارات
-| الاختبار | يقيس |
-|---|---|
-| `StartupBenchmarks` | زمن بدء التشغيل البارد (Cold Startup) |
-| `ConversationBenchmarks` | سلاسة فتح/تصفح المحادثة (Frames) |
-| `MessageProcessingBenchmarks` | سرعة معالجة الرسائل الواردة |
-| `GroupMessageProcessingBenchmarks` | معالجة رسائل المجموعات الكبيرة |
-| `SearchBenchmarks` | أداء البحث في قوائم كبيرة |
-| `ThreadDeletionBenchmarks` | أداء حذف المحادثات |
+اختبارات Android benchmark داخل `src/main`.
 
-## 🚀 التشغيل
-```bash
-./gradlew :benchmark:connectedBenchmarkAndroidTest
-# يتطلب جهازًا معياريًا (root + نسخة release + إغلاق التطبيقات الأخرى)
-```
+## العلاقة بباقي المشروع
 
-## 🔗 العلاقة
-- يستخدم `:app` كـ target
-- مكمّل لـ `microbenchmark/` (قياسات دقيقة) و`baseline-profile/` (تحسينات بدء التشغيل)
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
+
+## التحقق
+
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

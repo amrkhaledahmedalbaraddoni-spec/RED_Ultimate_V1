@@ -1,7 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
-    kotlin("plugin.spring") version "2.1.0"
-    id("org.springframework.boot") version "3.4.0"
+    kotlin("jvm") version "2.4.10"
+    kotlin("plugin.spring") version "2.4.10"
+    kotlin("plugin.jpa") version "2.4.10"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -37,10 +38,16 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // PSTN / Asterisk
-    implementation("org.asteriskjava:asterisk-java:3.40.0")
+    implementation("org.asteriskjava:asterisk-java:3.41.0")
 
-    // Protobuf
-    implementation("com.google.protobuf:protobuf-java:3.25.1")
+    // One authoritative RED protocol shared by Android and the backend
+    implementation(project(":shared-proto"))
+
+    // Argon2id password hashing
+    implementation("org.bouncycastle:bcprov-jdk18on:1.79")
+
+    // Local S3-compatible object storage
+    implementation("io.minio:minio:8.6.0")
 
     // OkHttp for Dinstar API
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -53,12 +60,13 @@ dependencies {
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.1.0")
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
-        jvmTarget = "21"
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xjsr305=strict")
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 

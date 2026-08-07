@@ -1,60 +1,21 @@
-# `pstn-asterisk/` — بوابة الهاتف (System B)
+# pstn-asterisk/ — جسر DINSTAR الصوتي
 
-إعدادات **Asterisk PBX** — الجسر بين التطبيق (WebRTC) وشبكة الجوال اليمنية عبر بوابة **DINSTAR UC2000**. مسؤول عن **System B** (مكالمات GSM/PSTN).
+> **الحالة:** نشط اختياري — منفصل عن RED WebRTC
 
----
+## الوظيفة
 
-## 📁 الملفات
+Asterisk مخصص لمسار Android → backend authorization → AMI/Asterisk → DINSTAR → SIM. لا يحتوي عميل RED WebRTC. الإعدادات الحساسة تُولد وقت التشغيل، والوارد غير المربوط يُرفض.
 
-| الملف | الوظيفة |
-|---|---|
-| `Dockerfile` | صورة `andrius/asterisk` + نسخ الإعدادات + المنافذ |
-| `extensions.conf` | منطق التوجيه (Dialplan) |
-| `manager.conf` | واجهة إدارة AMI (مستخدم `red_admin`) |
-| `pjsip.conf` | إعدادات SIP الرئيسية |
-| `pjsip_dinstar.conf` | نسخة بديلة مبسطة (احتياطية) |
+## المحتوى
 
-## 🔌 المنافذ
-| المنفذ | الاستخدام |
-|---|---|
-| 5060/udp + tcp | SIP (الوسيط والبوابة) |
-| 5038 | AMI (تحكم الخادم عبر asterisk-java) |
-| 8088 | HTTP/AJAM |
+`Dockerfile`، `docker-entrypoint.sh` لتوليد AMI/PJSIP، `extensions.conf` dialplan مقيد.
 
----
+## العلاقة بباقي المشروع
 
-## 🔄 منطق التوجيه (`extensions.conf`)
-```
-[from-internal]  ← المكالمات الصادرة: Dial(PJSIP/${EXTEN}@dumin-trunk)
-                  (كل رقم → جسر Dumin/Dinstar GSM)
-[from-pstn]      ← المكالمات الواردة من Dinstar: → PJSIP/webrtc-client
-                  (إلى تطبيق المستخدم)
-```
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
 
-## 🎛️ الإعدادات الرئيسية (`pjsip.conf`)
-- **`dinstar-gateway`**: الجهاز الفيزيائي عند `sip:192.168.1.100:5060` — الترميزات `g729, alaw, ulaw, gsm` (g729 لأداء أفضل في اليمن)
-- **`webrtc-client`**: نقطة نهاية التطبيق — `webrtc=yes`, `dtls_auto_self_signed=yes`, `ice_support=yes`, الترميزات `opus, vp9, av1`، مصادقة `webrtc-client/red_secure_pass`
-- **AMI**: `red_admin` / `red_secret_123` (صلاحيات all)
+## التحقق
 
----
-
-## 🔗 كيف يعمل (التدفق الكامل)
-```
-المستخدم (تطبيق RED)
-   → WebRTC (opus/vp9) عبر webrtc-client
-   → Asterisk يترجم للترميزات (g729/alaw)
-   → DINSTAR UC2000 (192.168.1.100)
-   → شبكة الجوال اليمنية (يمن موبايل / سبأفون)
-```
-الخادم `backend-server` يتحكم في Asterisk عبر AMI (`DefaultManagerConnection` + `OriginateAction`).
-
-## 🚀 التشغيل
-```bash
-# عبر Docker Compose:
-docker-compose up pstn-gateway
-# يحتاج DINSTAR متصلًا على 192.168.1.100 مع شرائح SIM
-```
-
-## ⚠️ ملاحظات
-- كلمة مرور AMI افتراضية مكشوفة في الملف — يجب نقلها إلى `.env`
-- `g729` ملكية فكرية — يحتاج ترخيصًا في بعض المناطق
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

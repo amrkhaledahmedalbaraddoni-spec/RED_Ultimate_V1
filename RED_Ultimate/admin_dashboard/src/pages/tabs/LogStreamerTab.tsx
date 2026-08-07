@@ -1,40 +1,49 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Card, Tag } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Card, Tag } from 'antd';
+import { apiFetch } from '../../api';
 
 const LogStreamerTab: React.FC = () => {
     const [logs, setLogs] = useState<string[]>([]);
+    const [status, setStatus] = useState<'CONNECTING'|'ONLINE'|'OFFLINE'|'ERROR'>('CONNECTING');
+    const [error, setError] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/admin/logs`);
-        ws.onmessage = (event) => {
-            setLogs(prev => [...prev.slice(-100), event.data]); // Keep last 100 logs
+        let socket: WebSocket | undefined;
+        let cancelled = false;
+        const connect = async () => {
+            setStatus('CONNECTING'); setError('');
+            try {
+                const response = await apiFetch('/api/admin/ws-ticket', { method: 'POST' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                if (!payload.ticket) throw new Error('INVALID_TICKET_RESPONSE');
+                if (cancelled) return;
+                const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                socket = new WebSocket(`${scheme}://${window.location.host}/ws/admin/logs?ticket=${encodeURIComponent(payload.ticket)}`);
+                socket.onopen = () => setStatus('ONLINE');
+                socket.onmessage = event => setLogs(previous => [...previous.slice(-199), String(event.data)]);
+                socket.onerror = () => { setStatus('ERROR'); setError('تعذر فتح قناة السجل الآمنة'); };
+                socket.onclose = () => { if (!cancelled) setStatus(current => current === 'ERROR' ? current : 'OFFLINE'); };
+            } catch (reason: any) {
+                if (!cancelled) { setStatus('ERROR'); setError(`تعذر إصدار تذكرة WebSocket: ${reason?.message || 'UNKNOWN'}`); }
+            }
         };
-        return () => ws.close();
+        connect();
+        return () => { cancelled = true; socket?.close(); };
     }, []);
 
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [logs]);
 
+    const color = status === 'ONLINE' ? 'green' : status === 'CONNECTING' ? 'gold' : 'red';
     return (
-        <Card title="🔴 LIVE SYSTEM LOGS (Sovereign Monitor)" style={{ background: '#000', border: '1px solid #333' }}>
-            <div 
-                ref={scrollRef}
-                style={{ 
-                    height: '400px', 
-                    overflowY: 'auto', 
-                    fontFamily: 'monospace', 
-                    background: '#050505', 
-                    padding: '16.dp',
-                    color: '#00ff00' 
-                }}
-            >
-                {logs.map((log, i) => (
-                    <div key={i} style={{ marginBottom: '4px', borderBottom: '1px solid #111' }}>
-                        <span style={{ color: '#888' }}>[{new Date().toLocaleTimeString()}]</span> {log}
-                    </div>
-                ))}
+        <Card title="سجل أحداث يونس المباشر" extra={<Tag color={color}>{status}</Tag>} style={{ background: '#030712', border: '1px solid #17344A' }}>
+            {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} />}
+            <div ref={scrollRef} style={{ height: 400, overflowY: 'auto', fontFamily: 'monospace', background: '#020617', padding: 16, color: '#7EF0C5' }}>
+                {logs.length === 0 && <div style={{ color: '#64748B' }}>لا توجد أحداث مستلمة بعد.</div>}
+                {logs.map((log, index) => <div key={`${index}-${log}`} style={{ marginBottom: 4, borderBottom: '1px solid #0F172A' }}>{log}</div>)}
             </div>
         </Card>
     );

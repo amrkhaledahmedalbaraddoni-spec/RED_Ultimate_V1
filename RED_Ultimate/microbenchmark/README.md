@@ -1,33 +1,21 @@
-# `microbenchmark/` — قياس الأداء الدقيق للبروتوكول
+# microbenchmark/ — Microbenchmark تاريخي
 
-وحدة **Microbenchmark** لقياس أداء **بروتوكول Signal** نفسه (تشفير/فك، توليد مفاتيح) بدقة نانوثانية — بدون تشغيل التطبيق كاملًا.
+> **الحالة:** غير مدرج حاليًا
 
----
+## الوظيفة
 
-## 📁 المحتوى
+قياسات دقيقة موروثة لخوارزميات/بروتوكولات. ليست دليل أداء للنسخة الحالية قبل إعادة ربطها بـ `red-app`.
 
-```
-microbenchmark/src/
-├── androidTest/
-│   ├── AndroidManifest.xml
-│   └── java/org/signal/
-│       ├── microbenchmark/ProtocolBenchmarks.kt     ← ⭐ قياسات البروتوكول
-│       └── util/
-│           ├── InMemorySignalServiceAccountDataStore.kt  ← تخزين حساب في الذاكرة (بدون قرص)
-│           └── SignalClient.kt                           ← عميل Signal للاختبار
-└── main/AndroidManifest.xml
-```
+## المحتوى
 
-## 🧪 `ProtocolBenchmarks.kt` — ماذا يقيس؟
-- عمليات بروتوكول Signal الفعلية: توليد المفاتيح، التشفير، فك التشفير
-- يستخدم `InMemorySignalServiceAccountDataStore` — حساب كامل في الذاكرة (أسرع وأدق من القرص)
+`src/androidTest` وملف ProGuard للاختبارات.
 
-## 🚀 التشغيل
-```bash
-./gradlew :microbenchmark:connectedAndroidTest
-# يتطلب جهازًا معياريًا (root + نسخة release)
-```
+## العلاقة بباقي المشروع
 
-## 🔗 العلاقة
-- يكمل `benchmark/` (قياسات التطبيق الواسعة) — هذا يركز على **بروتوكول التشفير**
-- `benchmark-proguard-rules.pro` لحماية أسماء الفئات أثناء R8
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
+
+## التحقق
+
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

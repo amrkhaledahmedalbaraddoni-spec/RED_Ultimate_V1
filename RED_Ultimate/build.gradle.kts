@@ -7,8 +7,6 @@ import java.io.FileNotFoundException
 
 plugins {
   alias(libs.plugins.android.application) apply false
-  alias(libs.plugins.jetbrains.kotlin.android) apply false
-  alias(libs.plugins.jetbrains.kotlin.jvm) apply false
   alias(libs.plugins.compose.compiler) apply false
   alias(libs.plugins.ktlint)
   alias(libs.plugins.hilt) apply false
@@ -31,7 +29,6 @@ buildscript {
   dependencies {
     classpath(libs.gradle)
     classpath(libs.androidx.navigation.safe.args.gradle.plugin)
-    classpath(libs.protobuf.gradle.plugin)
     classpath("com.squareup.wire:wire-gradle-plugin:6.4.0") {
       exclude(group = "com.squareup.wire", module = "wire-swift-generator")
       exclude(group = "com.squareup.wire", module = "wire-grpc-client")
@@ -147,7 +144,7 @@ gradle.projectsEvaluated {
     dependsOn("buildQa")
     dependsOn("checkStopship")
 
-    dependsOn(appTestTask)
+    appTestTask?.let { dependsOn(it) }
     appCompileInstrumentationTask?.let { dependsOn(it) }
 
     dependsOn(":fast-lint:fastLint")
@@ -172,11 +169,11 @@ gradle.projectsEvaluated {
   // If you let all of these things run in parallel, gradle will likely OOM.
   // To avoid this, we put non-app tests and lints behind the much heavier app tests and lints.
   subprojects.filter { it.name != "app" }.forEach { subproject ->
-    appTestTask.let { task ->
+    appTestTask?.let { task ->
       subproject.tasks.findByName("testDebugUnitTest")?.mustRunAfter(task)
       subproject.tasks.findByName("test")?.mustRunAfter(task)
     }
-    appLintTask.let { task ->
+    appLintTask?.let { task ->
       subproject.tasks.findByName("lintDebug")?.mustRunAfter(task)
     }
   }

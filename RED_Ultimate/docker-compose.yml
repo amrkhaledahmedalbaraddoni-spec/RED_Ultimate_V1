@@ -1,113 +1,414 @@
-version: '3.8'
+name: red-sovereign
 
 services:
-  # 1. The Brain: RED Unified Server
+  # 1. The Brain: RED Unified Sovereign Backend (Spring Boot 3.4 + Kotlin)
+  # Unified: sovereign strict secrets (?required) + ultimate monitoring & tuning
   backend:
-    build: ./backend-server
+    build:
+      context: .
+      dockerfile: backend-server/Dockerfile
     container_name: red-backend
+    restart: unless-stopped
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-postgres:5432/red_sovereign
-      - SPRING_DATASOURCE_USERNAME=admin
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-password}
-      - SPRING_DATA_MONGODB_URI=mongodb://db-mongo:27017/red
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-postgres:5432/${POSTGRES_DB:-red_sovereign}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-admin}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - SPRING_DATA_MONGODB_URI=mongodb://red_user:${MONGO_PASSWORD:?MONGO_PASSWORD is required}@db-mongo:27017/${MONGO_DB:-red_sovereign}?authSource=admin
+      - SPRING_DATA_REDIS_HOST=cache-redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       - REDIS_HOST=cache-redis
-      - ASTERISK_AMI_USER=red_admin
-      - ASTERISK_AMI_PASSWORD=${AMI_PASSWORD:-red_secret_123}
+      - ASTERISK_AMI_HOST=pstn-gateway
+      - ASTERISK_AMI_USER=${AMI_USER:-red_admin}
+      - ASTERISK_AMI_PASSWORD=${AMI_PASSWORD:?AMI_PASSWORD is required}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - RED_ADMIN_USERNAME=${RED_ADMIN_USERNAME:?RED_ADMIN_USERNAME is required}
+      - RED_ADMIN_PASSWORD=${RED_ADMIN_PASSWORD:?RED_ADMIN_PASSWORD is required}
+      - DINSTAR_USERNAME=${DINSTAR_USERNAME:?DINSTAR_USERNAME is required}
+      - DINSTAR_PASSWORD=${DINSTAR_PASSWORD:?DINSTAR_PASSWORD is required}
+      - DINSTAR_IP=${DINSTAR_IP:-192.168.11.1}
+      - DINSTAR_PORT=${DINSTAR_PORT:-80}
+      - DINSTAR_SCHEME=${DINSTAR_SCHEME:-http}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ROOT_USER=${MINIO_USER:-redadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:?MINIO_PASSWORD is required}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
+      - RED_IDENTITY_PRIVATE_KEY_PATH=/run/secrets/red_identity_private_key.pem
+      - RED_IDENTITY_PUBLIC_KEY_PATH=/run/secrets/red_identity_public_key.pem
+      - REFRESH_EXPIRATION_DAYS=${REFRESH_EXPIRATION_DAYS:-30}
+      - TURN_SECRET=${TURN_SECRET:?TURN_SECRET is required}
+      - TURN_PUBLIC_HOST=${TURN_PUBLIC_HOST:-127.0.0.1}
+      - TURN_PORT=3478
+      - JAVA_OPTS=-Xms512m -Xmx2g -XX:+UseG1GC
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - backend-logs:/app/logs
     depends_on:
       db-postgres: { condition: service_healthy }
       db-mongo: { condition: service_healthy }
+      cache-redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks: ["red-net"]
+    ports:
+      - "8080:8080"
 
-  # 2. VoIP/Conference SFU (System A)
+  # 2. VoIP/Conference SFU - System A (mediasoup 4K AV1/VP9/H264) - Unified
   media-sfu:
-    build: ./media-sfu
+    build:
+      context: ./media-sfu
+      dockerfile: Dockerfile
     container_name: red-media-sfu
-    ports: ["4000:4000", "40000-40100:40000-40100/udp"]
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MEDIASOUP_WORKER_BIN=/app/node_modules/mediasoup/worker/out/Release/mediasoup-worker
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP:?MEDIASOUP_ANNOUNCED_IP is required}
+      - MEDIASOUP_WORKERS=${MEDIASOUP_WORKERS:-2}
+      - RTC_MIN_PORT=40000
+      - RTC_MAX_PORT=40100
+      - REDIS_HOST=cache-redis
+      - BACKEND_URL=http://backend:8080
+      - LOG_LEVEL=warn
+    ports:
+      - "4000:4000"
+      - "40000-40100:40000-40100/udp"
+      - "40000-40100:40000-40100/tcp"
+    depends_on:
+      cache-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks: ["red-net"]
+    volumes:
+      - sfu-logs:/app/logs
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
-  # 3. Relay: COTURN
+  # 3. NAT Traversal: COTURN (STUN/TURN) - Unified secure
   coturn:
-    image: coturn/coturn
+    image: coturn/coturn:4.6.2-alpine
     container_name: red-turn
-    ports: ["3478:3478", "3478:3478/udp"]
-    environment:
-      - REALM=red.sovereign
-      - SECRET=${TURN_SECRET:-redturnsecret}
+    restart: unless-stopped
+    command:
+      - -n
+      - --log-file=stdout
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:?TURN_SECRET is required}
+      - --realm=red.sovereign
+      - --min-port=45000
+      - --max-port=45050
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "45000-45050:45000-45050/udp"
     networks: ["red-net"]
+    volumes:
+      - turn-data:/var/lib/coturn
 
-  # 4. PSTN Gateway: Asterisk PBX
+  # 4. PSTN Gateway: Asterisk PBX - System B (DINSTAR UC2000-VE-8T) - Unified
   pstn-gateway:
-    image: andrius/asterisk
+    build:
+      context: ./pstn-asterisk
+      dockerfile: Dockerfile
     container_name: red-pstn-gateway
-    volumes: ["./pstn-asterisk:/etc/asterisk"]
-    ports: ["5060:5060/udp", "5038:5038"]
+    restart: unless-stopped
+    environment:
+      - AMI_PASSWORD=${AMI_PASSWORD:?AMI_PASSWORD is required}
+      - AMI_USER=${AMI_USER:-red_admin}
+      - DINSTAR_IP=${DINSTAR_IP:-192.168.11.1}
+    volumes:
+      - ./pstn-asterisk:/etc/asterisk:ro
+      - asterisk-logs:/var/log/asterisk
+      - asterisk-spool:/var/spool/asterisk
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5038:5038"
+      - "10000-10100:10000-10100/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show version' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      backend:
+        condition: service_healthy
     networks: ["red-net"]
 
-  # 5. Database: PostgreSQL 16
+  # 5. Database: PostgreSQL 16 - Authority & Metadata (System C) - Unified with tuning
   db-postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: red-db-sql
+    restart: unless-stopped
     environment:
-      - POSTGRES_DB=red_sovereign
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-red_sovereign}
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend-server/src/main/resources/db/migration:/docker-entrypoint-initdb.d/:ro
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "admin"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-red_sovereign}"]
       interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks: ["red-net"]
+    ports:
+      - "5432:5432"
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c wal_buffers=16MB
+      -c checkpoint_completion_target=0.9
 
-  # 6. Database: MongoDB 8
+  # 6. Database: MongoDB 8 - Messages & Stories (System C - Ultra Fast)
   db-mongo:
-    image: mongo:8
+    image: mongo:8.0
     container_name: red-db-nosql
-    volumes: ["mongo-data:/data/db"]
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-    networks: ["red-net"]
-
-  # 7. Cache: Redis 7
-  cache-redis:
-    image: redis:7
-    container_name: red-cache
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-    networks: ["red-net"]
-
-  # 8. Storage: MinIO
-  minio:
-    image: minio/minio
-    container_name: red-storage
-    command: server /data --console-address ":9001"
-    ports: ["9000:9000", "9001:9001"]
+    restart: unless-stopped
     environment:
-      - MINIO_ROOT_USER=redadmin
-      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:-redsecret123}
-    volumes: ["minio-data:/data"]
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-red_root}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-${MONGO_PASSWORD:?MONGO_PASSWORD is required}}
+      - MONGO_INITDB_DATABASE=${MONGO_DB:-red_sovereign}
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+      - ./infrastructure/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "${MONGO_ROOT_USER:-red_root}", "-p", "${MONGO_ROOT_PASSWORD:-${MONGO_PASSWORD:?}}", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: ["red-net"]
+    ports:
+      - "27017:27017"
+
+  # 7. Cache & Pub/Sub: Redis 7 (System C - Realtime) - Unified with memory policy
+  cache-redis:
+    image: redis:7-alpine
+    container_name: red-cache
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save 900 1
+      --save 300 10
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "-a", "${REDIS_PASSWORD:?}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: ["red-net"]
+    ports:
+      - "6379:6379"
+
+  # 8. Object Storage: MinIO S3 - Media, Backups, APKs (System C)
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: red-storage
+    restart: unless-stopped
+    command: server /data --console-address ":9001" --address ":9000"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_USER:-redadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:?MINIO_PASSWORD is required}
+      - MINIO_BROWSER=on
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: ["red-net"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # 9. MinIO Setup - Bucket Initialization (from Ultimate)
+  minio-setup:
+    image: minio/mc:latest
+    container_name: red-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 $${MINIO_USER:-redadmin} $${MINIO_PASSWORD:?} ;
+      /usr/bin/mc mb local/red-media --ignore-existing;
+      /usr/bin/mc mb local/red-backups --ignore-existing;
+      /usr/bin/mc mb local/red-apks --ignore-existing;
+      /usr/bin/mc mb local/red-avatars --ignore-existing;
+      /usr/bin/mc anonymous set public local/red-media;
+      /usr/bin/mc anonymous set public local/red-apks;
+      echo 'RED MinIO Buckets Initialized - Sovereign';
+      exit 0;
+      "
+    environment:
+      - MINIO_USER=${MINIO_USER:-redadmin}
+      - MINIO_PASSWORD=${MINIO_PASSWORD:?MINIO_PASSWORD is required}
     networks: ["red-net"]
 
-  # 9. Proxy & Admin UI
+  # 10. Reverse Proxy & Security Gateway: NGINX Ultimate - Unified
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: red-proxy
-    ports: ["80:80"]
-    volumes: ["./nginx.conf:/etc/nginx/nginx.conf"]
-    depends_on: [backend, admin-panel]
+    restart: unless-stopped
+    ports:
+      - "${RED_HTTP_PORT:-80}:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx-certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      backend:
+        condition: service_healthy
+      admin-panel:
+        condition: service_started
+      media-sfu:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks: ["red-net"]
 
+  # 11. Admin Dashboard - RED Sovereign Master Control (React 19 + Ant Design) - Unified
   admin-panel:
-    build: ./admin_dashboard
+    build:
+      context: ./admin_dashboard
+      dockerfile: Dockerfile
     container_name: red-admin-ui
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://localhost:80/api
+      - REACT_APP_WS_URL=ws://localhost:80/ws
+      - REACT_APP_SFU_URL=ws://localhost:80/sfu
+      - REACT_APP_VERSION=2.0.0-UNIFIED
+    depends_on:
+      backend:
+        condition: service_healthy
     networks: ["red-net"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # 12. Monitoring: Prometheus - Metrics Collection (from Ultimate)
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: red-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks: ["red-net"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 13. Visualization: Grafana - RED Master Metrics Dashboard (from Ultimate)
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: red-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-redadmin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-${GRAFANA_PASS:-red_grafana_2026_secure}}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infrastructure/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./infrastructure/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    networks: ["red-net"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
+  postgres-data:
+    driver: local
   mongo-data:
+    driver: local
+  mongo-config:
+    driver: local
+  redis-data:
+    driver: local
   minio-data:
+    driver: local
+  backend-logs:
+    driver: local
+  sfu-logs:
+    driver: local
+  asterisk-logs:
+    driver: local
+  asterisk-spool:
+    driver: local
+  nginx-logs:
+    driver: local
+  turn-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
 
 networks:
   red-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

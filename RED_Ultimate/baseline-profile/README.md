@@ -1,30 +1,21 @@
-# `baseline-profile/` — مولّد تحسينات بدء التشغيل
+# baseline-profile/ — Baseline Profile تاريخي
 
-وحدة تولّد **Baseline Profiles** تلقائيًا — ملفات AOT (تجميع مسبق) تسرّع بدء التشغيل والأداء العام للتطبيق (أسلوب Android/Google).
+> **الحالة:** غير مدرج حاليًا
 
----
+## الوظيفة
 
-## 📁 المحتوى
+مولد Profile من إرث Android لتحسين startup عند إعادة تفعيله مع التطبيق القانوني. لا يدخل APK الحالي لأن الوحدة غير موجودة في `settings.gradle.kts`.
 
-```
-baseline-profile/src/main/
-├── AndroidManifest.xml
-└── java/org/signal/baselineprofile/
-    ├── BaselineProfileGenerator.kt   ← ⭐ يولّد الـ profile بقياس حقيقي
-    └── BenchmarkSetup.kt             ← إعداد القياس (بدء التشغيل البارد)
-```
+## المحتوى
 
-## ⚙️ كيف يعمل؟
-1. `BenchmarkSetup.kt` يجهّز قياس "بدء التشغيل البارد"
-2. `BaselineProfileGenerator.kt` يشغّل التطبيق ويسجّل الفئات المُنفَّذة خلال البداية
-3. النتيجة: ملف `baseline-prof.txt` تلقائي يُدمج في التطبيق
+مصادر instrumentation و`build.gradle.kts`.
 
-## 🚀 التشغيل
-```bash
-./gradlew :baseline-profile:generateBaselineProfile
-# يتطلب جهازًا (نسخة release) — يولّد الملف ويعيد توليده عند تغيير الكود
-```
+## العلاقة بباقي المشروع
 
-## 🔗 العلاقة
-- يُدمج في `app/` (لتحسين بدء التشغيل)
-- يكمّل `benchmark/` و`microbenchmark/` (هذه تقيس، وهذه تحسّن)
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
+
+## التحقق
+
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

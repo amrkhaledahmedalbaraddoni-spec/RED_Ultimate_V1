@@ -1,42 +1,21 @@
-# `wire-handler/` — أداة توليد الكود (Wire Schema Handler)
+# wire-handler/ — أداة Wire build-time
 
-أداة **build-time** مخصصة (وليس خدمة تشغيل) — خطوة معالجة بعد توليد كود Kotlin بواسطة مكتبة **Wire** (ProtoBuf من Square) أثناء بناء مشروع Signal/RED.
+> **الحالة:** نشط كـ JAR بناء موروث
 
----
+## الوظيفة
 
-## 📁 المحتوى
+معالج Wire مخصص محمل من `wire-handler-1.0.0.jar` في buildscript. ليس خدمة runtime ولا بروتوكول الرسائل نفسه.
 
-```
-wire-handler/
-├── lib/                ← وحدة Kotlin JVM (الحاوية الفعلية)
-├── settings.gradle.kts ← rootProject.name = "wire-handler", include("lib")
-├── README.md           ← التوثيق الأصلي
-└── wire-handler-1.0.0.jar  ← الحزمة المبنية (5.3 KB)
-```
+## المحتوى
 
-## ⚙️ ماذا يفعل؟
+`lib/` المصدر، JAR المثبت، `settings.gradle.kts`.
 
-| الملف | الوظيفة |
-|---|---|
-| `lib/build.gradle.kts` | Kotlin JVM 2.2.20 + `wire-schema 6.4.0` |
-| `Handler.kt` | كلاس `Handler : SchemaHandler()` — يفتح كل ملف `.kt` مولّد و**يستبدل بايتات `countNonNull` بـ `countNonDefa`** (نفس الطول عمدًا → استبدال في الموقع دون تغيير أحجام الملفات) |
-| `Factory.kt` | `SchemaHandler.Factory` يعيد `Handler()` |
+## العلاقة بباقي المشروع
 
-## 🎯 الغرض
-تحايل ذكي لترقية دالة في الكود المولّد **دون إعادة توليد كامل** — يستخدمه `libsignal-service` عبر:
-```kotlin
-wire { schemaHandlerFactoryClass = "org.signal.wire.Factory" }
-```
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
 
-## 🛠️ البناء
-```bash
-./gradlew build
-mv lib/build/libs/wire-handler-1.0.0.jar .
-# ثم حدّث مسار الجرة في build.gradle عند تغيير الإصدار
-```
+## التحقق
 
----
-
-## 🔗 العلاقة
-- يُبنى مرة واحدة ويُحمل في `buildscript classpath` بالجذر (`build.gradle.kts`)
-- يؤثر على كل الوحدات التي تولّد كود Wire: `libsignal-service`، `core/util`، `core/network`
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

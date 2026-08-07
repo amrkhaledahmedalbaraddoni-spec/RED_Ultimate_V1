@@ -4,12 +4,13 @@ import {
     TeamOutlined, MessageOutlined, PhoneOutlined,
     SafetyOutlined, CloudServerOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
+import { apiFetch } from '../../api';
 
 const OverviewTab: React.FC = () => {
     const [stats, setStats] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/master/v1/stats/realtime')
+        apiFetch('/api/master/v1/stats/realtime')
             .then(res => res.json())
             .then(setStats)
             .catch(console.error);

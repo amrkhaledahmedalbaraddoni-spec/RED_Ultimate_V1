@@ -36,17 +36,6 @@ class RedSecurityService(
     }
 
     /**
-     * Reboot hardware (Dinstar gateway)
-     */
-    fun rebootHardware(deviceId: String): Map<String, Any> {
-        return mapOf(
-            "status" to "REBOOTING",
-            "deviceId" to deviceId,
-            "timestamp" to System.currentTimeMillis()
-        )
-    }
-
-    /**
      * Check device security status
      */
     fun getDeviceSecurityStatus(userId: String): Map<String, Any> {

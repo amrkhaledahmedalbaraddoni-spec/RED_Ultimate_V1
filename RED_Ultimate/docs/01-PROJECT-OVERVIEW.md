@@ -1,95 +1,105 @@
-# 01 — المشروع كاملًا: RED Ultimate
+# 01 — نظرة شاملة على RED Ultimate V1
 
-> وثيقة شاملة تشرح المشروع من الرؤية حتى الملفات. للملفات التفصيلية لكل مجلد راجع الفهرس في `README.md`.
+## الهدف
 
----
+RED منصة محلية أولًا للمراسلة الاجتماعية والمكالمات، لا تستخدم رقم هاتف أو SIM أو بريد أو SMS/OTP لإنشاء الحساب. ينشئ المستخدم `username` وكلمة مرور واسم عرض، ويحصل على RED ID، ثم يبقى الحساب والجهاز `PENDING` حتى موافقة المسؤول.
 
-## 1. ما هو RED Ultimate؟
+هذه الوثيقة تصف **الفرع القانوني الحالي**، لا الادعاءات التاريخية في المصادر المرجعية.
 
-**منظومة اتصالات "سيادية" كاملة** — مراسلة + مكالمات صوت/فيديو + مكالمات هاتف GSM — تعمل **محليًا على خادم خاص** دون الاعتماد على الإنترنت الخارجي أو خدمات جوجل. المشروع مبني على **فورك كامل من Signal-Android** (أشهر تطبيق مراسلة مشفر عالميًا) مع طبقة "RED" مضافة فوقه.
+## المكونات القانونية
 
-**نقطة البداية**: `app/` يحوي 3,768 ملف Signal أصلي (حزم `org.thoughtcrime.securesms`) + 31 ملف RED مخصص (حزم `com.red.sovereign`).
+| المكوّن | المسار | الحالة |
+|---|---|---|
+| Android | `red-app/` ويظهر كـ Gradle `:app` | يبني APK في CI |
+| Backend | `backend-server/` | Spring Boot/Kotlin/JVM 21 |
+| Protocol | `shared-proto/src/main/proto/red_protocol.proto` | المصدر الموحد |
+| Admin | `admin_dashboard/` | React/Vite/Ant Design |
+| SFU | `media-sfu/` | Node/mediasoup |
+| PSTN | `pstn-asterisk/` | Asterisk/DINSTAR صوت فقط |
+| Runtime | `docker-compose.yml` + `nginx.conf` | تشغيل محلي متعدد الخدمات |
 
----
+`app/` و`android/` و`app-android/` وبقية وحدات Signal القديمة مصادر استخراج فقط وخارج graph الحالي. المرجع الحاسم هو `settings.gradle.kts`.
 
-## 2. الأنظمة الثلاثة (فكرة المشروع المركزية)
+## الفصل بين مساري المكالمات
 
-| النظام | الوظيفة | التقنية | الملفات المسؤولة |
-|---|---|---|---|
-| **System A** | مكالمات صوت/فيديو عالية الجودة (VoIP) | WebRTC + خادم وسائط Mediasoup | `media-sfu/` (خادم) + `feature:camera`, `android/features/calls` (تطبيق) |
-| **System B** | مكالمات هاتف GSM/PSTN يمنية | بوابة DINSTAR UC2000 (8 شرائح) + Asterisk PBX | `pstn-asterisk/` (خادم) + `backend-server` (تحكم AMI) + شاشة `PstnDialerScreen` |
-| **System C** | رسائل مشفرة بتوصيل مضمون | WebSocket + Protobuf + Room + MongoDB/Redis | `backend-server` (خادم) + `shared-proto/` (الاتفاقية) + `app` (العميل) |
+```text
+RED صوت/فيديو:
+RED ID ↔ WebRTC ↔ backend signaling/SFU/TURN ↔ WebRTC ↔ RED ID
+لا SIM، لا DINSTAR، ولا Asterisk.
 
-**الرابط بينها**: تطبيق واحد يعرضها كلها — المكالمات VoIP والـ GSM في نفس قائمة المكالمات، والرسائل كلها في شاشة محادثة واحدة.
-
----
-
-## 3. الميزات الرئيسية
-
-- ✅ تسجيل بموافقة إدارية (Approval Flow) — لا أحد يدخل دون إذن المدير
-- ✅ قصص تنتهي 24 ساعة (تُرفع إلى MinIO)
-- ✅ رسائل ذاتية التدمير (Burn)
-- ✅ مزامنة الرسائل المفقودة (Sequence Sync عبر `SyncRequest` + أرقام تسلسل من Redis)
-- ✅ لوحة تحكم إدارية كاملة (React) مع **KILL SWITCH** و**Remote Wipe** ومراقبة حية
-- ✅ رفع وسائط إلى MinIO (S3 محلي)
-- ✅ ثيم فاخر "AQYAL Sovereign" (ذهبي/أوبسيديان/أزرق ملكي)
-
----
-
-## 4. الخريطة المعمارية (كل مكون يبني فين)
-
-```
-                            RED_Ultimate_V1-main/
-                            └── RED_Ultimate/          ← جذر المشروع
-    ┌────────────┬────────────┬────────────┬──────────────┬──────────────┐
-    ▼            ▼            ▼            ▼              ▼              ▼
- التطبيقات    الخوادم     لوحات التحكم   البنية التحتية   وحدات الكود   الجودة والأداء
- ─────────   ─────────   ────────────   ─────────────   ────────────   ─────────────
- app/        backend-    admin_dashboard/ media-sfu/     core/ (7)     lintchecks/
- (الرئيسي)   server/     (النشطة)        pstn-asterisk/ lib/ (18)     fast-lint/
- android/    server/     admin-dashboard/ infrastructure/ feature/ (3) benchmark/
- (AQYAL)     (قديم)      (قديمة)         reproducible-   demo/ (12)    microbenchmark/
- app-android/                          builds/          shared-proto/  baseline-profile/
- (DevelopedChat)                       wire-handler/    gradle/        build-logic/
+DINSTAR صوت يمني:
+Android ↔ backend authorization/limits ↔ AMI/Asterisk ↔ DINSTAR ↔ SIM ↔ الشبكة اليمنية
 ```
 
-## 5. الهرمية (من يعتمد على من)
+Asterisk لا يحتوي عميل RED WebRTC، ومنفذ AMI غير منشور للمضيف في Compose. الاتصال الوارد غير المربوط يُرفض بدل تحويله إلى وجهة وهمية.
 
+## تدفق الحساب والهوية
+
+1. Android يولد هوية libsignal وsigned pre-key وKyber محليًا.
+2. تُحفظ المواد الخاصة مشفرة بمفتاح AES-GCM غير قابل للتصدير في Android Keystore.
+3. يرسل التطبيق المواد العامة فقط مع التسجيل.
+4. PostgreSQL يحفظ المستخدم والجهاز `PENDING`.
+5. المسؤول يراجع البصمة ويوافق.
+6. سلطة الهوية المحلية توقع شهادة جهاز ECDSA P-256.
+7. تسجيل الدخول يصدر Access JWT وrefresh token دوارًا ومقيدًا بالجهاز.
+8. أي reuse لعائلة refresh يلغي الجلسة.
+
+لا يجوز أن تغادر مفاتيح الهوية أو pre-key الخاصة جهاز Android.
+
+## تدفق الرسالة الخاصة
+
+```text
+Android sender
+  → directory + certificate verification
+  → atomic one-time EC/Kyber consumption عند إنشاء جلسة فقط
+  → libsignal PQXDH + Double Ratchet
+  → RedProtos.RedRED ciphertext
+  → /ws/master
+  → MongoDB durable sequence/offline queue
+  → Android receiver device
+  → decrypt locally
+  → SENT / DELIVERED / READ ACK
 ```
-                       app/  (تطبيق الإنتاج — Signal + RED)
-                         │
-           ┌─────────────┼─────────────┐
-           ▼             ▼             ▼
-     feature/ (3)   lib/ (18)    core/ (7)
-     (ميزات)        (مكتبات)     (أساسيات)
-           │             │             │
-           └─────────────┴─────────────┘
-                     build-logic/ (بلجنات البناء)
-                     gradle/ (الإصدارات)
-```
 
-**خارج الهرمية** (مستقلة): `backend-server` + `media-sfu` + `pstn-asterisk` + `admin_dashboard` (خوادم) — `demo/` (عينات مستقلة).
+الخادم لا يملك plaintext ولا يوفر بحثًا في محتوى المحادثة. المنشورات العامة ليست E2EE ويجب ألا تُوصف بأنها مشفرة طرفيًا.
 
----
+## واجهة Android
 
-## 6. المكونات الثلاثة المهمة (قرارات معمارية)
+خمس وجهات رئيسية:
 
-| المكوّن | التفاصيل |
-|---|---|
-| **wire-handler/** | أداة build-time توليد كود Wire — تحويلة ذكية لترقية دالة في الكود المولّد دون إعادة توليد |
-| **reproducible-builds/** | بناء APK متطابقة بايت-بايت (Code Transparency) — التحقق أن الموزَّع = المصدري |
-| **build-logic/** | بلجنات `signal.*` من Signal الأصلية (ktlint, licenses, translations, verification) + أدوات (StaticIpResolver للبناء القابل للتكرار) |
+1. المنشورات/نبض RED.
+2. المحادثات والمجموعات.
+3. إنشاء مركزي.
+4. سجل مكالمات موحد.
+5. هاتف DINSTAR ذهبي منفصل.
 
----
+الوظائف التي لا تملك engine فعليًا تبقى معطلة وموضحة بـ«قيد الربط»؛ لا توجد نجاحات وهمية مقصودة.
 
-## 7. الوضع الحالي (حسب التقارير)
+## التشغيل المحلي
 
-| البند | الحالة |
-|---|---|
-| البناء الكامل | ❌ غير قابل حاليًا (فئات مرجعية مفقودة، وحدات غير مسجلة في settings) |
-| `app/` | ✅ معمارية سليمة — يعمل كفورك Signal بطبقة RED |
-| الخوادم | ✅ تعمل لوحدها (Spring Boot + node) |
-| الأمان | ⚠️ `/api/**` مفتوح + أسرار افتراضية — يحتاج تقوية |
-| الميزات المعلنة | ⚠️ بعضها محاكاة (تشفير كمومي، 4K/AV1) |
+Nginx هو المدخل على المنفذ 80:
 
-**للتقييم التفصيلي**: `TECHNICAL_REPORT_AR.md` + `VERIFICATION_REPORT_AR.md` (في جذر المستودع).
+- `/api/` و`/health` → backend.
+- `/ws/` → WebSockets في backend.
+- `/sfu` و`/sfu-health` → mediasoup.
+- `/` → لوحة الإدارة.
+
+الخدمات المحلية: PostgreSQL وMongoDB وRedis وMinIO وbackend وadmin وSFU وTURN وAsterisk وNginx. راجع `LOCAL_FIRST_RUN_AR.md`.
+
+## بوابات التحقق
+
+بوابة CI الحالية تبني/تختبر backend، تبني Android مع dependency verification صارم، تبني لوحة الإدارة، تثبت SFU وتفحص JavaScript، وتولد إعداد Asterisk الآمن. هذه لا تستبدل:
+
+- تشغيل Compose على جهاز حقيقي.
+- اختبار هاتفين لـ E2EE/WebRTC.
+- اختبار TURN بين شبكتين.
+- اختبار DINSTAR/Yemen Mobile/Sabafon/YOU على العتاد.
+- نسخ احتياطي واستعادة وضغط وأمن وRelease signing.
+
+## وثائق مرتبطة
+
+- [02-DATABASES.md](02-DATABASES.md)
+- [03-SERVER-ADMIN-PANEL.md](03-SERVER-ADMIN-PANEL.md)
+- [04-APPS.md](04-APPS.md)
+- [../W0_MODULE_BOUNDARIES.md](../W0_MODULE_BOUNDARIES.md)
+- [../LOCAL_FIRST_RUN_AR.md](../LOCAL_FIRST_RUN_AR.md)

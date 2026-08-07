@@ -90,7 +90,7 @@ JAR:             2 ملف
 - NDK: 28.0.13004108
 
 ### 4. ملفات البروتوكول ✅
-- shared-proto/red_protocol.proto: 1,204 بايت
+- shared-proto/src/main/proto/red_protocol.proto: 1,204 بايت
 - shared-proto/messages.proto: 655 بايت
 - java_package: com.red.sovereign.proto + com.red.proto
 - جميع الرسائل معرّفة (RedRED, ChatMessage, MessageAck, SyncRequest, TypingRED, DeleteRED)

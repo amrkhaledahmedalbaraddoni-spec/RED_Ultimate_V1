@@ -1,136 +1,82 @@
-# 04 — التطبيقات: الثلاثة وكل ما بداخلها
+# 04 — تطبيقات Android: المنتج والمصادر التاريخية
 
-> المشروع يحوي **3 تطبيقات Android** بأسماء حزم مختلفة تطورت عبر الزمن. هذه الوثيقة تشرح كل واحد: مكانه، حزمه، ميزاته، وعلاقته بالباقي.
+## القرار المعماري الحالي
 
----
+يوجد **منتج Android واحد فقط** في graph:
 
-## 🏆 مقارنة سريعة
-
-| | `app/` | `android/` | `app-android/` |
-|---|---|---|---|
-| **الاسم** | RED Sovereign (الرئيسي) | AQYAL Sovereign | DevelopedChat |
-| **الحالة** | ✅ **الرئيسي والنشط** | بديل/نموذج | الأقدم |
-| **الحزمة** | `com.red.sovereign` | `com.red.app` | `com.red.*` / `com.developedchat` |
-| **الأساس** | **Signal-Android كامل** (3,768 ملف) | Compose + Hilt نظيف | Compose + Hilt بسيط |
-| **الملفات** | ~3,800+ | ~90 | ~40 |
-| **مسجل في settings** | ✅ | ❌ | ❌ |
-| **قاعدة بيانات** | SignalDatabase + RedMasterDatabase | MasterDatabase (Room v2) | PstnDatabase |
-| **قابل للبناء** | ❌ (ناقص فئات) | ❌ (غير مسجل) | ❌ (غير مسجل) |
-
----
-
-## 1. `app/` — التطبيق الرئيسي (RED Sovereign)
-
-**الفكرة**: فورك Signal كامل (كود أثبت جدارته عالميًا) + طبقة RED فوقه للتواصل مع خوادم المشروع.
-
-### البنية (حزمتان)
-```
-org.thoughtcrime.securesms/*   ← Signal الأصلية (3,768 ملف)
-│   ├── database/     ← SignalDatabase (Room، Migrations حتى V164)
-│   ├── service/      ← الخدمات والاتصال بخادم Signal
-│   ├── conversations/← شاشات المحادثات
-│   └── ...           ← كل أجزاء Signal
-
-com.red.sovereign/*            ← طبقة RED (31 ملف)
-├── core/
-│   ├── database/     ← RedMasterDatabase (messages/groups/call_logs) + MasterDao
-│   ├── delivery/     ← MasterDeliveryEngine (الإرسال)
-│   ├── di/           ← RedMasterModule (Hilt)
-│   └── MasterFeatureSet.kt
-├── features/
-│   ├── calls/        ← RedVoipMaster (System A)
-│   ├── chat/         ← ChatViewModel, RedChatScreen, RedChatDetail
-│   ├── pstn/         ← DialPadScreen, PstnViewModel (System B)
-│   └── stories/      ← StoryViewModel
-├── security/         ← QuantumGuard, IdentityManager, RedIdentityManager
-├── RedSovereignApp.kt (Application)، RedMainHost.kt، RedWebSocketClient.kt، RedMediaTransporter.kt، CallOrchestrator.kt، SyncEngine.kt، NotificationBridge.kt، RedPushService.kt، PermissionRequestScreen.kt، SovereignAuthScreens.kt
+```kotlin
+include(":app")
+project(":app").projectDir = file("red-app")
 ```
 
-### الميزات الفريدة (طبقة RED)
-| الملف | الوظيفة |
-|---|---|
-| `RedWebSocketClient.kt` | اتصال WebSocket بخادم الرسائل (/ws/chat) |
-| `MasterDeliveryEngine.kt` | إرسال مضمون (Sequence + ACK) |
-| `SyncEngine.kt` | طلب المفقود عبر SyncRequest |
-| `QuantumGuard.kt` | "حارس كمومي" (مفهوم أمني — محاكاة) |
-| `RedMediaTransporter.kt` | رفع/تحميل الوسائط عبر MinIO |
-| `CallOrchestrator.kt` | تنسيق المكالمات VoIP |
-| `DialPadScreen.kt` | لوحة اتصال GSM (DINSTAR) |
-| `LuxuryChatBubble.kt` | فقاعات فاخرة (ثيم ذهبي) |
+وجود مجلدات Android أخرى لا يعني وجود ثلاثة APKs قابلة للإطلاق. هي مصادر تاريخية للاستخراج، موثقة كي لا يعيد مطور توصيلها بالخطأ.
 
----
+## المقارنة
 
-## 2. `android/` — نسخة AQYAL السيادية (البديلة)
+| المسار | الدور الحالي | يدخل البناء؟ | الاستخدام الصحيح |
+|---|---|---:|---|
+| `red-app/` | تطبيق RED القانوني | نعم، `:app` | التطوير والاختبار والإصدار |
+| `app/` | فورك Signal تاريخي كبير | لا | Gold mine لتقنيات منتقاة ومراجعة الترخيص |
+| `android/` | نموذج AQYAL سابق | لا | أفكار UI/قصص/مكالمات تُنقل يدويًا |
+| `app-android/` | نموذج DevelopedChat أقدم | لا | مرجع لتدفق الموافقة وبعض Compose |
 
-**الفكرة**: إعادة بناء خفيفة من الصفر بالتصميم الفاخر "AQYAL Sovereign" (ذهبي/أوبسيديان/أزرق ملكي) — بدون عبء كود Signal.
+## `red-app/`
 
-### البنية
-```
-android/
-├── app/                    ← MainActivity + RedMainDashboard (داشبورد 5 تبويبات)
-│   └── sovereign/          ← MasterSystemOrchestrator (Hilt ينسق 3 أنظمة), RedConnector
-├── core/
-│   ├── database/           ← MasterDatabase (Room v2: Message/Conversation/PstnLog/Story/StoryView)
-│   ├── delivery/           ← BurnManager, MessageDeliveryManager, RedDeliveryEngine, SyncManager
-│   ├── di/                 ← StoryModule (Hilt)
-│   ├── linker/             ← RedSystemLinker (يربط A+B+C)
-│   ├── network/            ← MinioUploader, RedNotificationService (بدون FCM)
-│   ├── theme/              ← RedTheme (AQYAL)
-│   └── utils/              ← MediaCompressor (JPEG 85% / H.264 720p), VideoTrimmer (30 ثانية)
-└── features/
-    ├── auth/               ← RedSplashScreen
-    ├── calls/ (10 ملفات)    ← RedVoipMaster, VoipEngine, WebRtcSignaler, VideoCallScreen, RedCallLogScreen, RedCallForegroundService, LiveBroadcast*, ConferenceScreen
-    ├── chat/ (9)           ← RedChatListScreen, RedChatBubble, MediaBubble, GroupManager, VoiceRecorder
-    ├── explore/            ← RedExploreScreen (بث + غرف صوتية)
-    ├── profile/ (6)        ← ProfileScreen, ProfileApi, SettingsScreen, RedSettingsScreen, UpdateScreen, BackupScreen
-    ├── pstn/ (3)           ← PstnEngine, PstnDialerScreen, RedDialButton
-    └── stories/ (4)        ← CreateStoryScreen, StoryListSection, StoryRepositoryImpl, StoryViewerScreen
-```
+### الهوية والمصادقة
 
-### الملاحظات
-- **الأنظمة الثلاثة كلها حاضرة**: calls = A، pstn = B، chat = C
-- أفضل تنفيذ لمفهوم "القصص" و"الدمج" (Linker)
-- الثيم الفاخر هو أبرز ميزة (خلفية متدرجة متحركة)
+- username/password/display name بلا هاتف أو بريد أو OTP.
+- RED ID مولد من الخادم.
+- PENDING حتى موافقة الإدارة.
+- Device ID وشهادة بصمة، JWT وrefresh rotation.
+- recovery codes محلية أحادية الاستخدام.
 
----
+### E2EE
 
-## 3. `app-android/` — DevelopedChat (الأقدم)
+- libsignal 0.86.5 المنشور والمتوافق.
+- identity + signed EC + Kyber-1024 generated locally.
+- one-time EC/Kyber pool وتجديد تلقائي.
+- PQXDH session ثم Double Ratchet.
+- protocol records مشفرة بـ Android Keystore AES-GCM.
+- targeted per-device envelopes وSENT/DELIVERED/READ.
 
-**الفكرة**: النموذج الأول — تطبيق بسيط يركز على **نظام الموافقة الإدارية** (أفضل تنفيذ للمفهوم).
+المتبقي: Safety Number/QR UX وKey Transparency وSender Keys distribution للمجموعات واختبار هاتفين فعلي.
 
-### البنية
-```
-app-android/
-├── app/                   ← MainAppNavigation (غير مستخدم)
-├── core/                  ← DeliveryEngine (object بسيط)
-└── features/
-    ├── app/               ← NavGraph + MainActivity (com.developedchat)
-    ├── core/
-    │   ├── delivery/      ← DevelopedWebSocketClientImpl (Bearer + Protobuf + إعادة اتصال)
-    │   ├── di/            ← NetworkModule (BASE_URL http://192.168.1.50:8080/api/)
-    │   ├── utils/         ← DevelopedLogger (TAG: RED_System)
-    │   └── workers/       ← StoryCleanupWorker (حذف القصص كل 15 دقيقة)
-    └── feature/
-        ├── auth/ (8)      ← AuthApi, AuthViewModel, Welcome/Login/Register, PendingApprovalScreen (ساعة رملية), PermissionRequestScreen (9 صلاحيات), StatusScreens
-        ├── chat/ (3)      ← ChatListScreen (بيانات وهمية), ChatDetailScreen (أيقونات Delivery), ChatViewModel
-        ├── pstn/ (3)      ← PstnCallScreen, PstnModels (Room), PstnViewModel (polling كل ثانية)
-        └── stories/ (2)   ← CameraCaptureScreen (CameraX), StoryViewerScreen (5 ثوانٍ/قصة)
-```
+### الواجهة
 
-### دورة الموافقة (أفضل تنفيذ في المشروع)
-```
-Register → PENDING → (المدير يوافق من اللوحة) → Login → يعمل التطبيق
-Rejected/Banned → شاشات حالة خاصة
-```
+خمس وجهات: المنشورات، المحادثات، إنشاء، المكالمات الموحدة، هاتف DINSTAR. Feed/following/Yemen/posts والمجموعات والحالات ورفع الوسائط موجودة بمستويات متفاوتة. أي engine غير موصول يجب أن يبقى disabled.
 
----
+### الاتصال المحلي
 
-## 4. تطور المشروع (الخلاصة)
+`RED_SERVER_URL` يحقن وقت البناء. Debug يسمح HTTP داخل LAN؛ release يمنع cleartext ويتطلب HTTPS. foreground WebSocket يعوض cloud push في local-first deployment.
 
-```
-app-android/ (النموذج الأول: الموافقة) 
-    → android/ (النسخة السيادية الفاخرة، الأنظمة الثلاثة) 
-    → app/ (القرار النهائي: فورك Signal + طبقة RED)
-```
+## `app/` — Signal Gold Mine
 
-**التوصية**: `app/` هو الخيار الصحيح للاستمرار (يرث أمان Signal واختباره)، مع استعارة أفكار ناضجة من `android/` (الثيم AQYAL، تنظيم القصص) و`app-android/` (سير الموافقة).
+هذا ليس التطبيق الرئيسي الآن. الاحتفاظ به يتيح دراسة تطبيقات Signal الأصلية، لكنه يحمل افتراضات وبنية واعتماديات ضخمة لا تناسب الخادم المحلي تلقائيًا. يمنع:
+
+- اعتباره دليلًا أن ميزة ما مفعلة.
+- استعادة endpoints سحابية.
+- إعادة الحزم/الخدمات المكررة إلى graph.
+- نسخ كود دون مراجعة AGPL/التراخيص والأمان.
+
+## `android/` — AQYAL reference
+
+يحتوي أفكارًا بصرية وتنظيمًا قديمًا للميزات. تُقارن واجهاته مع `red-app` ثم تُعاد كتابة القطعة المتوافقة؛ لا يعتمد `red-app` عليه ولا تُبنى مواده.
+
+## `app-android/` — prototype reference
+
+نموذج مبكر أصغر. قد يفيد لفهم شاشات pending/rejected، لكنه يستخدم نماذج وURLs قديمة ولا يحدد flow الحالي.
+
+## كيفية إضافة ميزة Android بصورة صحيحة
+
+1. أضفها في `red-app/src/main/java/com/red/sovereign/`.
+2. استخدم `AuthorizedApiClient` وmodels قانونية.
+3. للمراسلة عدّل `shared-proto` أولًا وحدث الطرفين.
+4. لا ترسل private key/plaintext إلى backend.
+5. اجعل UI معطلًا إذا لم يوجد runtime engine.
+6. أضف unit/instrumentation test مناسبًا.
+7. مرر `:app:assembleDebug --dependency-verification strict`.
+8. اختبر على جهاز حقيقي عند الكاميرا/الصوت/WebRTC/Keystore.
+
+## حالة الإصدار
+
+APK Debug يُنتج في CI وصورة artifacts. هذا لا يساوي Release: ما تزال مفاتيح التوقيع، R8 release validation، TLS، سياسة الخصوصية، SBOM/licensing، واختبارات الأجهزة مطلوبة.

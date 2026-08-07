@@ -1,21 +1,29 @@
 package com.red.server.database
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
-@Document(collection = "messages")
+@Document("messages")
 data class MessageDocument(
     @Id val id: String? = null,
-    val uuid: String,
-    val conversationId: String,
-    val senderId: String,
-    val receiverId: String,
-    val payload: ByteArray,
+    @Indexed(unique = true) val uuid: String,
+    @Indexed val conversationId: String,
+    @Indexed val senderId: String,
+    @Indexed val receiverId: String,
+    var payload: ByteArray,
     val messageType: String = "TEXT",
+    val senderDeviceId: Int,
+    val receiverDeviceId: Int,
+    val ciphertextType: Int,
     val sequenceNumber: Long = 0,
-    val status: String = "SENT",
+    @Indexed var status: String = "SENT",
     val createdAt: Instant = Instant.now(),
     var deliveredAt: Instant? = null,
-    var readAt: Instant? = null
+    var readAt: Instant? = null,
+    var deletedAt: Instant? = null
 )
+
+@Document("conversation_sequences")
+data class ConversationSequence(@Id val conversationId: String, var sequence: Long = 0)

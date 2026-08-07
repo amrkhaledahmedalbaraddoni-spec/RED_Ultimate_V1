@@ -1,32 +1,21 @@
-# `infrastructure/` — سكربتات التهيئة
+# infrastructure/ — أدوات بنية تحتية إضافية
 
-سكربت إعداد البيئة بعد تشغيل المنظومة لأول مرة.
+> **الحالة:** مساعد — Compose هو المرجع
 
----
+## الوظيفة
 
-## 📁 المحتوى
+يحوي سكربتات قديمة/مساعدة للتهيئة. المصدر التشغيلي القانوني هو `docker-compose.yml` وNginx وملفات كل خدمة؛ لا تشغل سكربتًا هنا دون مراجعته.
 
-```
-infrastructure/
-└── setup-env.sh
-```
+## المحتوى
 
-## `setup-env.sh` — ماذا يفعل؟
-1. **MinIO**: عبر عميل `mc`:
-   - إضافة alias محلي `http://localhost:9000` (admin/password)
-   - إنشاء الدلائل: `red-media` و `red-backups`
-   - جعل `red-media` **عام (public)**
-2. **PostgreSQL**: إنشاء قاعدة البيانات `red_sovereign`
-3. رسالة تأكيد
+`setup-env.sh` أداة تهيئة تاريخية.
 
----
+## العلاقة بباقي المشروع
 
-## 🚀 الاستخدام
-```bash
-chmod +x setup-env.sh
-./setup-env.sh        # بعد تشغيل docker-compose
-```
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
 
-## ⚠️ ملاحظات
-- الاعتمادات هنا (`admin/password`) **لا تطابق** قيم compose الافتراضية (`redadmin/redsecret123`) — يحتاج ضبطًا قبل الاستخدام
-- يفترض اسم خدمة Postgres هو `db` بينما compose يستخدم `db-postgres`
+## التحقق
+
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

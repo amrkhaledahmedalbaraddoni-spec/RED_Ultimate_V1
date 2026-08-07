@@ -1,39 +1,61 @@
 package com.red.server.auth
 
-import org.springframework.web.bind.annotation.*
+import com.red.server.auth.model.AccountStatus
+import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import java.util.concurrent.ConcurrentHashMap
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+import java.time.Duration
 
 @RestController
 @RequestMapping("/api/auth")
-class AuthController {
-
-    // محاكاة لقاعدة بيانات المستخدمين وحالاتهم
-    private val userDatabase = ConcurrentHashMap<String, String>() // Email -> Status
+class AuthController(
+    private val registration: RegistrationService,
+    private val recovery: RecoveryService,
+    private val limits: RateLimitService
+) {
 
     @PostMapping("/register")
-    fun register(@RequestBody data: Map<String, String>): ResponseEntity<Any> {
-        val email = data["email"] ?: return ResponseEntity.badRequest().build()
-        userDatabase[email] = "PENDING"
-        return ResponseEntity.ok(mapOf("status" to "PENDING", "message" to "Waiting for Admin Approval"))
+    fun register(@RequestBody request: RegisterRequest, servlet: HttpServletRequest): ResponseEntity<AuthResponse> {
+        limits.check("register", clientIp(servlet), 5, Duration.ofHours(1))
+        return ResponseEntity.status(HttpStatus.CREATED).body(registration.register(request))
     }
 
     @PostMapping("/login")
-    fun login(@RequestBody data: Map<String, String>): ResponseEntity<Any> {
-        val email = data["email"] ?: return ResponseEntity.badRequest().build()
-        val status = userDatabase[email] ?: "NOT_FOUND"
-
-        return when (status) {
-            "APPROVED" -> ResponseEntity.ok(mapOf("token" to "red-jwt-${java.util.UUID.randomUUID()}", "status" to "OK"))
-            "PENDING" -> ResponseEntity.status(403).body(mapOf("error" to "PENDING_APPROVAL"))
-            "BANNED" -> ResponseEntity.status(403).body(mapOf("error" to "ACCOUNT_BANNED"))
-            else -> ResponseEntity.status(401).build()
+    fun login(@RequestBody request: LoginRequest, servlet: HttpServletRequest): ResponseEntity<AuthResponse> {
+        val rateIdentity = "${clientIp(servlet)}:${request.username}"
+        limits.check("login", rateIdentity, 10, Duration.ofMinutes(15))
+        val response = registration.login(request)
+        limits.reset("login", rateIdentity)
+        val status = when (response.status) {
+            AccountStatus.APPROVED -> HttpStatus.OK
+            AccountStatus.PENDING -> HttpStatus.LOCKED
+            AccountStatus.REJECTED, AccountStatus.SUSPENDED, AccountStatus.BANNED -> HttpStatus.FORBIDDEN
         }
+        return ResponseEntity.status(status).body(response)
     }
 
-    @PostMapping("/admin/approve")
-    fun approveUser(@RequestParam email: String): ResponseEntity<Any> {
-        userDatabase[email] = "APPROVED"
-        return ResponseEntity.ok(mapOf("message" to "User $email approved"))
+    @PostMapping("/refresh")
+    fun refresh(@RequestBody request: RefreshRequest): RefreshResponse = registration.refresh(request)
+
+    @PostMapping("/logout")
+    fun logout(@RequestBody request: LogoutRequest): ResponseEntity<Void> {
+        registration.logout(request)
+        return ResponseEntity.noContent().build()
     }
+
+    @PostMapping("/recover")
+    fun recover(@RequestBody request: PasswordRecoveryRequest, servlet: HttpServletRequest): ResponseEntity<Void> {
+        val rateIdentity = "${clientIp(servlet)}:${request.redId}"
+        limits.check("recover", rateIdentity, 5, Duration.ofHours(1))
+        recovery.reset(request)
+        limits.reset("recover", rateIdentity)
+        return ResponseEntity.noContent().build()
+    }
+
+    private fun clientIp(request: HttpServletRequest): String =
+        request.getHeader("X-Forwarded-For")?.substringBefore(',')?.trim()?.takeIf { it.isNotEmpty() } ?: request.remoteAddr
 }

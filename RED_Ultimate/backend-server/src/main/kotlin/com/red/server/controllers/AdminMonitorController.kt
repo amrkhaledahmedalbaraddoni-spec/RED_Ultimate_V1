@@ -9,30 +9,23 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/admin")
 class AdminMonitorController(
-    private val mongoTemplate: MongoTemplate,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val mongo: MongoTemplate,
+    private val redis: RedisTemplate<String, String>
 ) {
     @GetMapping("/monitor/stats")
-    fun getMonitorStats(): Map<String, Any> {
-        val activeUsers = redisTemplate.keys("red:presence:*").size
-        val totalMessages = mongoTemplate.getCollection("messages").countDocuments()
-        
+    fun stats(): Map<String, Any> {
+        val cutoff = System.currentTimeMillis() - 5 * 60_000
+        redis.opsForZSet().removeRangeByScore("red:presence:index", 0.0, cutoff.toDouble())
+        val runtime = Runtime.getRuntime()
+        val used = runtime.totalMemory() - runtime.freeMemory()
         return mapOf(
-            "active_users" to activeUsers,
-            "total_messages" to totalMessages,
-            "system_load" to (Runtime.getRuntime().let { 
-                ((it.totalMemory - it.freeMemory).toDouble() / it.maxMemory * 100).toInt() 
-            }),
-            "uptime_ms" to ManagementFactory_getUptime(),
-            "cpu_cores" to Runtime.getRuntime().availableProcessors(),
-            "jvm_memory_mb" to (Runtime.getRuntime().totalMemory() / 1024 / 1024),
+            "active_users" to (redis.opsForZSet().zCard("red:presence:index") ?: 0),
+            "total_messages" to mongo.getCollection("messages").countDocuments(),
+            "jvm_memory_percent" to if (runtime.maxMemory() == 0L) 0 else (used * 100 / runtime.maxMemory()),
+            "uptime_ms" to runCatching { java.lang.management.ManagementFactory.getRuntimeMXBean().uptime }.getOrDefault(0L),
+            "cpu_cores" to runtime.availableProcessors(),
+            "jvm_memory_mb" to (runtime.totalMemory() / 1024 / 1024),
             "timestamp" to System.currentTimeMillis()
         )
-    }
-    
-    private fun ManagementFactory_getUptime(): Long {
-        return try {
-            java.lang.management.ManagementFactory.getRuntimeMXBean().uptime
-        } catch (e: Exception) { 0L }
     }
 }

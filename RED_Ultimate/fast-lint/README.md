@@ -1,39 +1,21 @@
-# `fast-lint/` — أداة فحص سريع (خارجية)
+# fast-lint/ — محرك Lint سريع
 
-محرك قواعد **Kotlin/Java AST** سريع — يستخدمه المطور يدويًا (عبر External Tool في IDE) لفحص ملف أو مجلد بكامل سياقه، مع **اختبارات وحدات** لكل قاعدة. مستقل تمامًا عن بناء التطبيق.
+> **الحالة:** مصدر QA تاريخي — غير مدرج حاليًا
 
----
+## الوظيفة
 
-## 📁 المحتوى
+محرك AST وقواعد سريعة موروثة. مهمة `ci` تشير إليه تاريخيًا، لكن الوحدة غير مسجلة في graph القانوني؛ يلزم ربط صريح قبل تشغيلها.
 
-```
-fast-lint/
-├── build.gradle.kts              ← بناء Java/Kotlin JVM
-└── src/main/java/com/red/fastlint/
-    ├── FastLint.kt               ← ⭐ نقطة الدخول (واجهة + محرك)
-    ├── Lint.kt                   ← المحرك: يفحص نطاق ملف/مشروع
-    ├── Finding.kt                ← نتيجة فحص (ملف + سطر + رسالة)
-    ├── Rule.kt                   ← واجهة القاعدة (apply to AST)
-    ├── AllRules.kt               ← تسجيل كل القواعد
-    └── rules/
-        ├── AlertDialogRule.kt            ← AlertDialog القديم
-        ├── DatabaseReferenceRule.kt      ← استخدامات DB غير آمنة
-        ├── ForegroundServiceRule.kt      ← خدمات أمامية خاطئة
-        ├── LogNotSignalRule.kt           ← Log عادي بدل SignalLog
-        ├── LogTagInlinedRule.kt          ← TAG داخل السطر (تضخيم)
-        ├── StringResourceEscapingRule.kt ← رسائل بدون strings.xml
-        └── VersionCodeRule.kt            ← رقم إصدار يدوي
-```
+## المحتوى
 
-## 🧪 الاختبارات (`src/test/`)
-قاعدة لكل ملف اختبار: `AlertDialogRuleTest`, `DatabaseReferenceRuleTest`, `ForegroundServiceRuleTest`, `LogNotSignalRuleTest`, `LogTagInlinedRuleTest`, `StringResourceEscapingRuleTest`, `VersionCodeRuleTest` + `TestSupport.kt`.
+`src/main` المحرك والقواعد، `src/test` اختباراته.
 
-## 🚀 الاستخدام
-```bash
-./gradlew test    # تشغيل اختبارات القواعد
-# داخل Android Studio: External Tools → تشغيل FastLint على الملف المفتوح
-```
+## العلاقة بباقي المشروع
 
-## 🔗 العلاقة
-- **أداة تطوير شخصية** — لا تدخل في سلسلة البناء (عكس `lintchecks/` الذي يُدمج تلقائيًا)
-- قواعدها تشبه `lintchecks/` لكن أسرع وأخف (فحص ملف واحد)
+- راجع [`../settings.gradle.kts`](../settings.gradle.kts) لمعرفة ما يدخل البناء فعلًا؛ وجود المصدر لا يعني أنه مفعّل.
+- الحدود القانونية موثقة في [`../W0_MODULE_BOUNDARIES.md`](../W0_MODULE_BOUNDARIES.md).
+- خريطة النظام الكاملة في [`../docs/01-PROJECT-OVERVIEW.md`](../docs/01-PROJECT-OVERVIEW.md).
+
+## التحقق
+
+لا تُعلن ميزة هذا المجلد مكتملة إلا إذا دخلت بوابة البناء المناسبة واختبار runtime/جهازها. أسرار `.env` و`secrets/` ومفاتيح Android الخاصة لا تُحفظ في Git.

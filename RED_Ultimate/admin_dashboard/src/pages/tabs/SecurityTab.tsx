@@ -1,36 +1,30 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, Button, Modal, Input, Alert, Tag, Space, Table, message } from 'antd';
 import { SafetyOutlined, WarningOutlined, DeleteOutlined, LockOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
+import { apiFetch } from '../../api';
 const SecurityTab: React.FC = () => {
     const [killSwitchModal, setKillSwitchModal] = useState(false);
     const [wipeModal, setWipeModal] = useState(false);
     const [targetUserId, setTargetUserId] = useState('');
     const [reason, setReason] = useState('');
+    const [securityEvents, setSecurityEvents] = useState<any[]>([]);
+    const loadAudit = async () => { const response = await apiFetch('/api/admin/audit'); if (response.ok) setSecurityEvents(await response.json()); };
+    useEffect(() => { loadAudit(); }, []);
 
-    const handleKillSwitch = () => {
+    const handleKillSwitch = async () => {
         if (!reason) { message.error('Reason required'); return; }
-        fetch('/api/master/v1/security/kill-switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reason })
-        })
-        .then(() => { message.success('Kill switch activated!'); setKillSwitchModal(false); })
-        .catch(() => message.error('Failed'));
+        const response = await apiFetch(`/api/admin/security/kill-switch?reason=${encodeURIComponent(reason)}`, { method: 'POST' });
+        if (!response.ok) return message.error('Kill switch failed');
+        message.success('Kill switch activated'); setKillSwitchModal(false); await loadAudit();
     };
 
-    const handleWipe = () => {
+    const handleWipe = async () => {
         if (!targetUserId) { message.error('User ID required'); return; }
-        fetch(`/api/master/v1/security/wipe/${targetUserId}`, { method: 'POST' })
-            .then(() => { message.success('Wipe signal sent!'); setWipeModal(false); })
-            .catch(() => message.error('Failed'));
+        const response = await apiFetch(`/api/admin/security/wipe?userId=${encodeURIComponent(targetUserId)}`, { method: 'POST' });
+        if (!response.ok) return message.error('Wipe failed');
+        message.success('Wipe signal sent'); setWipeModal(false); await loadAudit();
     };
-
-    const securityEvents = [
-        { key: '1', event: 'Failed login attempt', user: 'user-789', time: '3 min ago', severity: 'warning' },
-        { key: '2', event: 'New device registered', user: 'user-123', time: '15 min ago', severity: 'info' },
-        { key: '3', event: 'Session expired', user: 'user-456', time: '1 hour ago', severity: 'info' },
-    ];
 
     return (
         <div>
@@ -45,25 +39,25 @@ const SecurityTab: React.FC = () => {
             <Row gutter={[16, 16]}>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Threat Level" value="LOW" prefix={<SafetyOutlined />}
+                        <Statistic title="Threat Level" value="UNKNOWN" prefix={<SafetyOutlined />}
                             valueStyle={{ color: '#52c41a' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Blocked Devices" value={0} prefix={<LockOutlined />}
+                        <Statistic title="Blocked Devices" value="—" prefix={<LockOutlined />}
                             valueStyle={{ color: '#ff4d4f' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Active Sessions" value={12} prefix={<SafetyOutlined />}
+                        <Statistic title="Active Sessions" value="—" prefix={<SafetyOutlined />}
                             valueStyle={{ color: '#1890ff' }} />
                     </Card>
                 </Col>
                 <Col span={6}>
                     <Card>
-                        <Statistic title="Security Score" value={95} suffix="/100"
+                        <Statistic title="Security Score" value="N/A"
                             prefix={<SafetyOutlined />} valueStyle={{ color: '#52c41a' }} />
                     </Card>
                 </Col>
@@ -88,14 +82,15 @@ const SecurityTab: React.FC = () => {
                     <Card title="Recent Security Events">
                         <Table
                             dataSource={securityEvents}
+                            rowKey="id"
                             columns={[
-                                { title: 'Event', dataIndex: 'event', key: 'event' },
-                                { title: 'User', dataIndex: 'user', key: 'user' },
-                                { title: 'Severity', dataIndex: 'severity', key: 'severity',
-                                  render: (s: string) => <Tag color={s === 'warning' ? 'orange' : 'blue'}>{s}</Tag> },
-                                { title: 'Time', dataIndex: 'time', key: 'time' },
+                                { title: 'Action', dataIndex: 'action', render: (v: string) => <Tag color={v.includes('KILL') ? 'red' : 'blue'}>{v}</Tag> },
+                                { title: 'Target', dataIndex: 'targetId', render: (v: string) => v || '—' },
+                                { title: 'Administrator', dataIndex: 'actorId', render: (v: string) => v || 'SYSTEM' },
+                                { title: 'Time', dataIndex: 'createdAt', render: (v: string) => new Date(v).toLocaleString('ar') },
                             ]}
-                            pagination={false}
+                            locale={{emptyText:'لا توجد أحداث تدقيق مسجلة'}}
+                            pagination={{pageSize:8}}
                             size="small"
                         />
                     </Card>

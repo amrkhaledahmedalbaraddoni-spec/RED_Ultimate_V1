@@ -1,0 +1,83 @@
+{
+  "$schema": "https://red.local/schemas/data.schema.json",
+  "version": 1,
+  "description": "Ownership contract for the data plane. Every schema, seed, fixture and persistent volume is declared here exactly once. Services may consume data at build time or runtime, but may not store their own copy. tools/guard/separation_guard.py enforces the paths.",
+  "principles": [
+    "The data plane is the only place where schema definitions exist.",
+    "Services never write to /data at build or run time; they only read declared artifacts.",
+    "Persistent engines are stateful infrastructure; their backups are declared here, not in a service.",
+    "Fixtures are development-only and are never loaded into a production start."
+  ],
+  "datasets": [
+    {
+      "id": "sql-migrations",
+      "path": "data/sql/migrations",
+      "engine": "postgresql",
+      "kind": "schema-migrations",
+      "authoritative": true,
+      "applied_by": "services/backend (Flyway, packaged into the jar at build time)",
+      "consumed_as": "classpath:migrations",
+      "notes": "Append-only. Never edit an applied migration; add the next version instead. Do not mount into docker-entrypoint-initdb.d."
+    },
+    {
+      "id": "sql-schema-reference",
+      "path": "data/sql/schema/master-schema.sql",
+      "engine": "postgresql",
+      "kind": "documentation",
+      "authoritative": false,
+      "applied_by": "nobody (reference snapshot for review only)",
+      "notes": "If it drifts from the migrations, the migrations win."
+    },
+    {
+      "id": "mongo-init",
+      "path": "data/mongo/init.js",
+      "engine": "mongodb",
+      "kind": "index-and-ttl-bootstrap",
+      "authoritative": true,
+      "applied_by": "db-mongo image, first initialization only (credentials injected, never stored in the file)",
+      "notes": "Idempotent index creation. Collections themselves are created by backend models."
+    },
+    {
+      "id": "seeds",
+      "path": "data/seeds",
+      "engine": "any",
+      "kind": "seed",
+      "authoritative": true,
+      "applied_by": "operator, deliberately",
+      "notes": "The first administrator is created by the backend from RED_ADMIN_USERNAME/PASSWORD, never as a SQL seed."
+    },
+    {
+      "id": "fixtures",
+      "path": "data/fixtures",
+      "engine": "none",
+      "kind": "fixture",
+      "authoritative": false,
+      "applied_by": "tests and local demos only",
+      "notes": "Example payloads (e.g. contacts.sample.json). Never shipped inside a release image."
+    }
+  ],
+  "runtime_stores": {
+    "description": "Named volumes are declared in contracts/stack.json and compose. This table maps each store to its backup contract and to the directory an operator uses for dumps and restore drills.",
+    "postgres-data": {"backup": "pg_dump + globals", "restore_drill": "required", "dump_dir": "data/runtime/backups/postgres"},
+    "mongo-data": {"backup": "mongodump --oplog", "restore_drill": "required", "dump_dir": "data/runtime/backups/mongo"},
+    "mongo-config": {"backup": "with mongo-data", "restore_drill": "required", "dump_dir": "data/runtime/backups/mongo"},
+    "redis-data": {"backup": "AOF snapshot (counters only)", "restore_drill": "optional", "dump_dir": "data/runtime/backups/redis"},
+    "minio-data": {"backup": "mc mirror to external disk", "restore_drill": "required", "dump_dir": "data/runtime/backups/minio"},
+    "turn-data": {"backup": "not required", "restore_drill": "none", "dump_dir": null},
+    "prometheus-data": {"backup": "not required", "restore_drill": "none", "dump_dir": null},
+    "grafana-data": {"backup": "provisioned as code; dashboards only", "restore_drill": "none", "dump_dir": null},
+    "backend-logs": {"backup": "not required", "restore_drill": "none", "dump_dir": null},
+    "sfu-logs": {"backup": "not required", "restore_drill": "none", "dump_dir": null},
+    "asterisk-logs": {"backup": "not required", "restore_drill": "none", "dump_dir": null},
+    "asterisk-spool": {"backup": "CDR retention policy", "restore_drill": "optional", "dump_dir": "data/runtime/backups/asterisk"},
+    "nginx-logs": {"backup": "not required", "restore_drill": "none", "dump_dir": null}
+  },
+  "never_in_git": [
+    "data/runtime/**",
+    "platform/secrets/**",
+    "platform/config/.env",
+    "*.dump",
+    "*.bson",
+    "*.archive"
+  ]
+}

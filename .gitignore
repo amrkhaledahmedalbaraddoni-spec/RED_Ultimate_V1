@@ -1,61 +1,61 @@
-# Dependencies
-node_modules/
-*/node_modules/
+# ============================================================================
+# RED — three planes, one contract. Nothing generated or secret is committed.
+# ============================================================================
 
-# Environment secrets (use .env.example as template)
+# ── Secrets and private configuration ───────────────────────────────────────
+platform/config/.env
+platform/config/.env.*
+!platform/config/.env.example
+platform/secrets/*
+!platform/secrets/.gitkeep
 .env
-!.env.example
+.env.*
 secrets/
 *.pem
 *.key
+*.jks
+*.keystore
+# Public debug-only keystore required for reproducible local APK builds.
+!services/android/signing/red-debug.p12
 
-# Gradle / Android build outputs
+# ── Data plane runtime artifacts ───────────────────────────────────────────
+data/runtime/*
+!data/runtime/.gitkeep
+*.dump
+*.bson
+*.archive
+
+# ── Build outputs (all planes) ─────────────────────────────────────────────
 .gradle/
 build/
-*/build/
+**/build/
+dist/
+**/dist/
+node_modules/
+**/node_modules/
 local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+*.apk
+*.aab
+*.zip
+local-artifacts/
+local-tools/*
+!local-tools/.gitignore
 
-# IDE files
+# ── Tooling caches ─────────────────────────────────────────────────────────
+local-maven/*
+!local-maven/.gitignore
+wire-handler/build/
+__pycache__/
+*.pyc
+
+# ── IDE / OS / logs ────────────────────────────────────────────────────────
 .idea/
 *.iml
 .vscode/
-
-# Logs & OS
 *.log
 logs/
 Thumbs.db
 .DS_Store
-
-# Keystores / signing (keep debug p12 for local builds)
-*.jks
-*.keystore
-# Allow RED debug keystore for reproducible local builds
-!RED_Ultimate/red-app/signing/red-debug.p12
-
-# Docker volumes / local data and extracted local builds
-minio-data/
-postgres-data/
-mongo-data/
-redis-data/
-prometheus-data/
-grafana-data/
-local-artifacts/
-minio-data/
-postgres-data/
-mongo-data/
-backend-logs/
-sfu-logs/
-nginx-logs/
-asterisk-logs/
-asterisk-spool/
-turn-data/
-mongo-config/
-
-# Build artifacts
-*.apk
-*.aab
-*.zip
-workspace-*.zip

@@ -1,3 +1,5 @@
+# The CI image builds from the repository root, so this file is the allow-list
+# boundary for every plane.
 .git
 .github
 **/.gradle
@@ -6,11 +8,19 @@
 **/node_modules
 **/.idea
 **/*.iml
-RED_Ultimate/app
-RED_Ultimate/android
-RED_Ultimate/app-android
-RED_Ultimate/benchmark
-RED_Ultimate/microbenchmark
-RED_Ultimate/baseline-profile
-RED_Ultimate/secrets
-image-search
+**/__pycache__
+
+# Never ship secrets or private configuration into an image.
+platform/secrets
+platform/config/.env
+.env
+
+# Not needed to build any artifact.
+docs
+tools/reproducible-builds
+data/runtime
+data/fixtures
+data/seeds
+local-artifacts
+local-tools
+local-maven/org/signal

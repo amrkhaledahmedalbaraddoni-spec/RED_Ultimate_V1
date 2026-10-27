@@ -1,26 +1,38 @@
 # syntax=docker/dockerfile:1.7
-# Root CI image: compile and test the canonical RED backend with the shared protocol.
+# ============================================================================
+# RED Ultimate — full verification image (CI).
+# Build context MUST be the repository root:
+#   docker build . --file platform/containers/ci.Dockerfile
+#
+# Stages: backend → android → admin → sfu → pstn → runtime image.
+# Every stage reads sources from services/ and configuration from platform/.
+# Schema comes from data/sql and is never copied into a service directory.
+# ============================================================================
+
+# ── 1. Backend build + tests ────────────────────────────────────────────────
 FROM gradle:8.12-jdk21 AS builder
 WORKDIR /build
-COPY RED_Ultimate/backend-server/ backend-server/
-COPY RED_Ultimate/shared-proto/ shared-proto/
-WORKDIR /build/backend-server
+COPY services/backend/ services/backend/
+COPY services/shared-proto/ services/shared-proto/
+COPY data/sql/ data/sql/
+WORKDIR /build/services/backend
 RUN --mount=type=cache,target=/home/gradle/.gradle/caches,sharing=locked \
     --mount=type=cache,target=/home/gradle/.gradle/wrapper,sharing=locked \
     gradle clean build --no-daemon > /tmp/gradle-build.log 2>&1 \
     || (echo '=== RED_BACKEND_GRADLE_FAILURE ==='; tail -n 120 /tmp/gradle-build.log; exit 1)
 
+# ── 2. Android APK build (verified dependencies) ────────────────────────────
 FROM ghcr.io/cirruslabs/android-sdk:35 AS android-builder
 ARG RED_SERVER_URL=http://127.0.0.1
 ARG RED_TARGET_ABI=arm64-v8a
-WORKDIR /build/RED_Ultimate
-COPY RED_Ultimate/build.gradle.kts RED_Ultimate/settings.gradle.kts RED_Ultimate/gradle.properties RED_Ultimate/gradlew ./
-COPY RED_Ultimate/gradle/ gradle/
-COPY RED_Ultimate/local-maven/ local-maven/
-COPY RED_Ultimate/build-logic/ build-logic/
-COPY RED_Ultimate/wire-handler/ wire-handler/
-COPY RED_Ultimate/red-app/ red-app/
-COPY RED_Ultimate/shared-proto/ shared-proto/
+WORKDIR /build
+COPY settings.gradle.kts build.gradle.kts gradle.properties lint.xml gradlew ./
+COPY gradle/ gradle/
+COPY local-maven/ local-maven/
+COPY build-logic/ build-logic/
+COPY wire-handler/ wire-handler/
+COPY services/android/ services/android/
+COPY services/shared-proto/ services/shared-proto/
 RUN --mount=type=cache,target=/root/.gradle/caches,sharing=locked \
     --mount=type=cache,target=/root/.gradle/wrapper,sharing=locked \
     sed -i 's/\r$//' gradlew \
@@ -29,35 +41,40 @@ RUN --mount=type=cache,target=/root/.gradle/caches,sharing=locked \
     && sh ./gradlew \
        -Dorg.gradle.jvmargs="-Xmx3g -Xms256m -XX:MaxMetaspaceSize=768m" \
        -Dkotlin.daemon.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=512m" \
-       :app:testDebugUnitTest :app:assembleDebug -PRED_SERVER_URL="$RED_SERVER_URL" -PRED_TARGET_ABI="$RED_TARGET_ABI" -PRED_SKIP_BUILD_LOGIC=true \
+       :app:testDebugUnitTest :app:assembleDebug \
+       -PRED_SERVER_URL="$RED_SERVER_URL" -PRED_TARGET_ABI="$RED_TARGET_ABI" \
+       -PRED_SKIP_BUILD_LOGIC=true \
        --dependency-verification strict --no-configuration-cache --no-daemon > /tmp/android-build.log 2>&1 \
     || (echo '=== RED_ANDROID_GRADLE_FAILURE ==='; tail -n 160 /tmp/android-build.log; exit 1)
 
-# Lightweight local export target: builds only Android and writes the APK directly to --output.
+# Lightweight local export target: builds only Android and writes the APK to --output.
 FROM scratch AS android-artifact
-COPY --from=android-builder /build/RED_Ultimate/red-app/build/outputs/apk/debug/*.apk /red-app-debug.apk
+COPY --from=android-builder /build/services/android/build/outputs/apk/debug/*.apk /red-app-debug.apk
 
+# ── 3. Admin dashboard build ────────────────────────────────────────────────
 FROM node:22-alpine AS admin-builder
 WORKDIR /build/admin
-COPY RED_Ultimate/admin_dashboard/package.json RED_Ultimate/admin_dashboard/package-lock.json ./
+COPY services/admin-dashboard/package.json services/admin-dashboard/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY RED_Ultimate/admin_dashboard/ ./
+COPY services/admin-dashboard/ ./
 RUN npm run build
 
+# ── 4. SFU dependency + syntax check ────────────────────────────────────────
 FROM node:22-bookworm AS sfu-check
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 build-essential pkg-config \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build/sfu
-COPY RED_Ultimate/media-sfu/package.json RED_Ultimate/media-sfu/package-lock.json ./
+COPY services/media-sfu/package.json services/media-sfu/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
-COPY RED_Ultimate/media-sfu/server.js ./
+COPY services/media-sfu/server.js ./
 RUN npm run check && touch /tmp/red-sfu-check-ok
 
+# ── 5. PSTN configuration check (no hardware required) ──────────────────────
 FROM andrius/asterisk AS pstn-check
-COPY RED_Ultimate/pstn-asterisk/extensions.conf /etc/asterisk/extensions.conf
-COPY RED_Ultimate/pstn-asterisk/docker-entrypoint.sh /usr/local/bin/red-asterisk-entrypoint
-COPY RED_Ultimate/scripts/local-first-run.sh /tmp/local-first-run.sh
+COPY platform/telephony/extensions.conf /etc/asterisk/extensions.conf
+COPY platform/telephony/docker-entrypoint.sh /usr/local/bin/red-asterisk-entrypoint
+COPY tools/scripts/local-first-run.sh /tmp/local-first-run.sh
 # Normalize shell files defensively because Windows worktrees may already contain CRLF
 # before .gitattributes is applied.
 RUN sed -i 's/\r$//' /tmp/local-first-run.sh /usr/local/bin/red-asterisk-entrypoint /etc/asterisk/extensions.conf \
@@ -71,13 +88,14 @@ RUN sed -i 's/\r$//' /tmp/local-first-run.sh /usr/local/bin/red-asterisk-entrypo
     && ! grep -q 'webrtc-client' /tmp/red-asterisk/pjsip.conf \
     && touch /tmp/red-pstn-check-ok
 
+# ── 6. Runtime image (backend + artifacts) ─────────────────────────────────
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /build/backend-server/build/libs/*.jar app.jar
-COPY --from=android-builder /build/RED_Ultimate/red-app/build/outputs/apk/debug/*.apk /opt/red-app-debug.apk
+COPY --from=builder /build/services/backend/build/libs/*.jar app.jar
+COPY --from=android-builder /build/services/android/build/outputs/apk/debug/*.apk /opt/red-app-debug.apk
 COPY --from=admin-builder /build/admin/dist /opt/red-admin-dashboard
 COPY --from=sfu-check /tmp/red-sfu-check-ok /opt/verification/red-sfu-check-ok
 COPY --from=pstn-check /tmp/red-pstn-check-ok /opt/verification/red-pstn-check-ok

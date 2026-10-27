@@ -1,0 +1,23 @@
+RED Production Mastery Checklist
+=================================
+
+Plane 1: [services/android] — canonical Android app (Gradle :app)
+- Auth with mandatory admin approval, chat with ACK, stories TTL, RED VoIP/SFU, isolated DINSTAR dialer.
+
+Plane 2: [services/backend] — Spring Boot API + WebSockets
+- Approval, messaging relay, PSTN authorization, media grants, audit.
+
+Plane 3: [services/admin-dashboard] — React SPA (static, behind the gateway)
+- Users, approvals, system health, DINSTAR control, live logs.
+
+Plane 4: [services/media-sfu] — mediasoup SFU for RED voice/video.
+
+Plane 5: [platform/telephony] — Asterisk config for the DINSTAR gateway (voice only).
+
+Protocol: [services/shared-proto] — one protobuf contract for Android and backend.
+
+Runtime: [platform/compose/docker-compose.yml] — 13 services, strict secrets, healthchecks.
+Data: [data/sql + data/mongo] — schema owned by the data plane.
+Contract: [contracts/*] — machine-checked by tools/guard/separation_guard.py.
+
+VERIFICATION: guard + compose config + CI image. No cloud dependency.

@@ -1,0 +1,175 @@
+{
+  "$schema": "https://red.local/schemas/separation.rules.json",
+  "version": 1,
+  "description": "Machine-checkable separation rules for the three planes. tools/guard/separation_guard.py enforces every entry; a violation fails CI before any build starts.",
+  "planes": {
+    "platform": {
+      "role": "infrastructure: how the stack is built, wired, exposed and observed",
+      "root": "platform",
+      "allow_extensions": [
+        ".yml",
+        ".yaml",
+        ".conf",
+        ".sh",
+        ".md",
+        ".txt",
+        ".json",
+        ".dockerfile",
+        ".Dockerfile",
+        ".pem",
+        ".crt",
+        ".key",
+        ".ct"
+      ],
+      "allow_filenames": [
+        ".gitkeep",
+        ".env.example",
+        "Dockerfile",
+        "README.md"
+      ],
+      "forbid_extensions": [
+        ".kt",
+        ".kts",
+        ".java",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".py",
+        ".go",
+        ".rs",
+        ".cs",
+        ".proto",
+        ".sql",
+        ".gradle"
+      ]
+    },
+    "services": {
+      "role": "source code of the product (application plane)",
+      "root": "services",
+      "forbid_extensions": [
+        ".sql",
+        ".conf",
+        ".pem",
+        ".crt",
+        ".key",
+        ".dump",
+        ".bson"
+      ],
+      "forbid_filenames": [
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+        ".env",
+        ".env.local"
+      ],
+      "forbid_globs": [
+        "Dockerfile",
+        "Dockerfile.*",
+        "*.Dockerfile",
+        "docker-compose*.yml",
+        "**/db/migration/**"
+      ],
+      "allow_yml": [
+        "services/backend/src/main/resources/application.yml"
+      ]
+    },
+    "data": {
+      "role": "schema, seeds, fixtures and persistent stores",
+      "root": "data",
+      "allow_extensions": [
+        ".sql",
+        ".js",
+        ".json",
+        ".md",
+        ".yml",
+        ".yaml",
+        ".csv",
+        ".txt",
+        ".gitkeep",
+        ".sh"
+      ],
+      "forbid_extensions": [
+        ".kt",
+        ".kts",
+        ".java",
+        ".ts",
+        ".tsx",
+        ".py",
+        ".go",
+        ".rs",
+        ".cs",
+        ".proto",
+        ".gradle",
+        ".dockerfile"
+      ]
+    },
+    "contracts": {
+      "role": "the single source of truth that binds the planes",
+      "root": "contracts",
+      "allow_extensions": [
+        ".json",
+        ".md"
+      ],
+      "forbid_extensions": [
+        ".kt",
+        ".java",
+        ".ts",
+        ".tsx",
+        ".py",
+        ".sh",
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    }
+  },
+  "uniqueness": {
+    "exactly_one": [
+      "platform/compose/docker-compose.yml",
+      "platform/config/.env.example",
+      "platform/proxy/nginx.conf",
+      "contracts/stack.json",
+      "contracts/data.json",
+      "contracts/env.schema.json"
+    ],
+    "forbid_paths": [
+      "RED_Ultimate",
+      "app",
+      "android",
+      "app-android",
+      "core",
+      "lib",
+      "feature",
+      "demo",
+      "benchmark",
+      "microbenchmark",
+      "baseline-profile",
+      "fast-lint",
+      "lintchecks",
+      "admin_dashboard",
+      "backend-server",
+      "media-sfu/Dockerfile",
+      "pstn-asterisk"
+    ],
+    "sql_location": "data/sql/",
+    "dockerfiles_location": [
+      "platform/containers/",
+      "tools/reproducible-builds/"
+    ],
+    "ci_mirror": {
+      "path": "Dockerfile",
+      "must_equal": "platform/containers/ci.Dockerfile",
+      "reason": "The repository token cannot edit .github/workflows, and the current workflow builds ./Dockerfile. Byte-identical mirror, enforced by the guard; remove with platform/ci/README.md."
+    }
+  },
+  "integration_gates": [
+    "every compose service exists in contracts/stack.json and vice versa",
+    "every build context and Dockerfile declared in the contract exists",
+    "every bind mount source exists on disk",
+    "every named volume is declared in compose and in the contract",
+    "every ${VAR} referenced by compose is declared in contracts/env.schema.json",
+    "platform/config/.env.example declares exactly the contracted variables",
+    "Gradle project directories declared in settings.gradle.kts exist",
+    "the backend packages the data plane from data/sql (no copies in the service)"
+  ]
+}
